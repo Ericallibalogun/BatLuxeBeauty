@@ -67,66 +67,66 @@ const Wishlist: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {items.map((item) => (
-            <div key={item.id} className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl group hover:shadow-2xl transition-all border border-pink-50 flex flex-col relative">
+            <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl transition-all border border-pink-50 flex flex-col relative">
               {/* Remove from Wishlist Button */}
               <button 
                 onClick={() => toggleWishlist(item.product)}
-                className="absolute top-6 right-6 z-10 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/90 backdrop-blur-md text-red-400 hover:text-red-600 shadow-lg transition-all active:scale-90 border border-pink-50"
+                className="absolute top-3 right-3 z-10 w-9 h-9 flex items-center justify-center rounded-xl bg-white/90 backdrop-blur-md text-red-400 hover:text-red-600 shadow-md transition-all active:scale-90 border border-pink-50"
                 aria-label="Remove from wishlist"
               >
-                <Trash2 size={20} />
+                <Trash2 size={16} />
               </button>
 
-              <div className="relative h-64 overflow-hidden">
+              <div className="relative h-48 overflow-hidden">
                 <img 
                   src={item.product?.image_url || 'https://picsum.photos/400/400'} 
                   alt={item.product?.name}
                   className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-6 left-6">
-                  <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-xl">
+                <div className="absolute top-3 left-3">
+                  <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
                     {item.product?.category || 'Beauty'}
                   </span>
                 </div>
               </div>
 
-              <div className="p-10 flex flex-col flex-grow text-left">
-                <h3 className="text-2xl font-black text-gray-900 mb-2 italic truncate">{item.product?.name}</h3>
-                <p className="text-2xl font-black text-pink-500 mb-4">£{(item.product?.price || 0).toFixed(2)}</p>
+              <div className="p-4 flex flex-col flex-grow text-left">
+                <h3 className="text-base font-black text-gray-900 mb-1 italic truncate">{item.product?.name}</h3>
+                <p className="text-lg font-black text-pink-500 mb-2">£{(item.product?.price || 0).toFixed(2)}</p>
                 
-                <div className="mb-6">
-                  <div className="bg-green-50/50 text-green-700 text-[10px] py-2 px-4 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">
-                    Limited Reserve ({item.product?.stock || 0} available)
+                <div className="mb-3">
+                  <div className="bg-green-50/50 text-green-700 text-[8px] py-1 px-2 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">
+                    {item.product?.stock || 0} available
                   </div>
                 </div>
                 
-                <div className="mt-auto space-y-4">
+                <div className="mt-auto space-y-2">
                   <button 
                     onClick={() => handleAddToCart(item.product)}
                     disabled={addingMap[item.product_id] || successMap[item.product_id]}
-                    className={`w-full py-4 rounded-xl font-black transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95 transform ${
+                    className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
                       successMap[item.product_id] 
                       ? 'bg-green-500 text-white' 
                       : 'bg-gray-900 hover:bg-pink-600 text-white'
                     }`}
                   >
                     {addingMap[item.product_id] ? (
-                      <Loader2 className="animate-spin" size={18} />
+                      <Loader2 className="animate-spin" size={14} />
                     ) : successMap[item.product_id] ? (
                       <>
-                        <Check size={18} /> In Cart
+                        <Check size={14} /> In Cart
                       </>
                     ) : (
                       <>
-                        <ShoppingCart size={18} /> Add to Cart
+                        <ShoppingCart size={14} /> Add to Cart
                       </>
                     )}
                   </button>
                   <Link 
                     to="/shop" 
-                    className="w-full py-3 text-center text-gray-400 hover:text-pink-500 font-black uppercase tracking-widest text-[10px] block transition-colors"
+                    className="w-full py-2 text-center text-gray-400 hover:text-pink-500 font-black uppercase tracking-widest text-[8px] block transition-colors"
                   >
                     View Details
                   </Link>

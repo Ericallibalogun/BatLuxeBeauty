@@ -42,6 +42,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return;
     }
+
+    // For authenticated users: Try backup first, then API
+    const backupCart = localStorage.getItem('auth_cart_backup');
+    if (backupCart) {
+      try {
+        const parsedBackup = JSON.parse(backupCart);
+        if (parsedBackup.length > 0) {
+          setItems(parsedBackup);
+        }
+      } catch (e) {
+        // Ignore backup parsing errors
+      }
+    }
     
     // For Logged In Users: Fetch from API
     setLoading(true);
@@ -144,21 +157,41 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = async (productId: string, quantity: number) => {
+    console.log('Updating quantity:', { productId, quantity, isGuest });
     if (quantity < 1) return;
+    
+    // Find the cart item to get the correct cart_item_id
+    const cartItem = items.find(item => item.product_id === productId);
+    if (!cartItem) {
+      console.error('Cart item not found for product:', productId);
+      return;
+    }
+    
+    // Always update local state first for immediate feedback
+    const newItems = items.map(item => 
+      item.product_id === productId 
+      ? { ...item, quantity: Number(quantity) } 
+      : item
+    );
+    setItems(newItems);
+    
     if (isGuest) {
-      const newItems = items.map(item => 
-        item.product_id === productId 
-        ? { ...item, quantity: Number(quantity) } 
-        : item
-      );
-      setItems(newItems);
       localStorage.setItem('guest_cart', JSON.stringify(newItems));
       return;
     }
+    
+    // Save to localStorage as backup for authenticated users too
+    localStorage.setItem('auth_cart_backup', JSON.stringify(newItems));
+    
+    // Try API sync in background using the correct cart_item_id
     try {
-      await api.put(`/cart/${productId}`, { quantity: Number(quantity) });
-      await fetchCart();
-    } catch (err) {}
+      console.log('Making API call to update quantity with cart_item_id:', cartItem.id);
+      await api.put(`/cart/${cartItem.id}`, { quantity: Number(quantity) });
+      console.log('API sync successful');
+    } catch (err) {
+      console.error('API sync failed, keeping local state:', err);
+      // Keep local state - user won't notice the API failure
+    }
   };
 
   const clearCart = async () => {

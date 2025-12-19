@@ -94,7 +94,13 @@ const Wishlist: React.FC = () => {
 
               <div className="p-10 flex flex-col flex-grow text-left">
                 <h3 className="text-2xl font-black text-gray-900 mb-2 italic truncate">{item.product?.name}</h3>
-                <p className="text-2xl font-black text-pink-500 mb-6">£{(item.product?.price || 0).toFixed(2)}</p>
+                <p className="text-2xl font-black text-pink-500 mb-4">£{(item.product?.price || 0).toFixed(2)}</p>
+                
+                <div className="mb-6">
+                  <div className="bg-green-50/50 text-green-700 text-[10px] py-2 px-4 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">
+                    Limited Reserve ({item.product?.stock || 0} available)
+                  </div>
+                </div>
                 
                 <div className="mt-auto space-y-4">
                   <button 

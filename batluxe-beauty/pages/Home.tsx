@@ -15,6 +15,7 @@ const Home: React.FC = () => {
 
   const [addingMap, setAddingMap] = useState<Record<string, boolean>>({});
   const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
+  const [wishlistLoading, setWishlistLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -25,7 +26,11 @@ const Home: React.FC = () => {
           ? rawData 
           : (rawData?.products || rawData?.data || []);
           
-        setProducts(productsArray.slice(0, 8)); // Show a good variety on home
+        // Sort products by stock (higher stock = more popular) and take top 20
+        const sortedProducts = productsArray
+          .sort((a, b) => (b.stock || 0) - (a.stock || 0))
+          .slice(0, 20);
+        setProducts(sortedProducts);
       } catch (err) {
         console.error("Error fetching products", err);
       } finally {
@@ -46,6 +51,19 @@ const Home: React.FC = () => {
         setSuccessMap(prev => ({ ...prev, [product.id]: false }));
       }, 2000);
     }
+  };
+
+  const handleToggleWishlist = async (product: Product) => {
+    setWishlistLoading(prev => ({ ...prev, [product.id]: true }));
+    try {
+      await toggleWishlist(product);
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+    }
+    // Always clear loading state after a short delay
+    setTimeout(() => {
+      setWishlistLoading(prev => ({ ...prev, [product.id]: false }));
+    }, 500);
   };
 
   return (
@@ -84,69 +102,88 @@ const Home: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-24">
             <span className="text-pink-500 font-black tracking-[0.4em] uppercase text-[10px] mb-4 block">Curation Elite</span>
-            <h2 className="text-5xl font-black text-gray-900 mb-6 italic tracking-tight">Featured Essentials</h2>
+            <h2 className="text-5xl font-black text-gray-900 mb-6 italic tracking-tight">Top Products</h2>
+            <p className="text-gray-400 font-medium max-w-2xl mx-auto mb-8 italic">
+              "Our most coveted selections, curated for the discerning aesthetic."
+            </p>
             <div className="w-24 h-2 bg-gradient-to-r from-pink-400 to-purple-400 mx-auto rounded-full shadow-lg"></div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {loading ? (
-              Array(4).fill(0).map((_, i) => (
-                <div key={i} className="animate-pulse bg-white rounded-[2.5rem] p-4 h-[500px] shadow-sm"></div>
+              Array(20).fill(0).map((_, i) => (
+                <div key={i} className="animate-pulse bg-white rounded-2xl p-3 h-[320px] shadow-sm"></div>
               ))
             ) : products.length > 0 ? (
               products.map((product) => (
-                <div key={product.id} className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl group hover:shadow-2xl transition-all border border-pink-50 flex flex-col relative text-left">
+                <div key={product.id} className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl transition-all border border-pink-50 flex flex-col relative text-left">
                   {/* Wishlist Button */}
                   <button 
-                    onClick={() => toggleWishlist(product)}
-                    className={`absolute top-6 right-6 z-10 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-md shadow-lg transition-all active:scale-90 border border-white/20 ${isInWishlist(product.id) ? 'bg-pink-500 text-white shadow-pink-200' : 'bg-white/80 text-gray-400 hover:text-pink-500'}`}
+                    onClick={() => handleToggleWishlist(product)}
+                    disabled={wishlistLoading[product.id]}
+                    className={`absolute top-3 right-3 z-10 w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-md shadow-md transition-all active:scale-90 border border-white/20 ${
+                      wishlistLoading[product.id] 
+                        ? 'bg-gray-200 text-gray-400' 
+                        : isInWishlist(product.id) 
+                          ? 'bg-pink-500 text-white shadow-pink-200' 
+                          : 'bg-white/80 text-gray-400 hover:text-pink-500 hover:bg-pink-50'
+                    }`}
                   >
-                    <Heart size={22} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
+                    {wishlistLoading[product.id] ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Heart 
+                        size={16} 
+                        fill={isInWishlist(product.id) ? 'currentColor' : 'none'} 
+                        className={isInWishlist(product.id) ? 'text-white' : 'text-gray-400'}
+                      />
+                    )}
                   </button>
 
-                  <div className="relative h-80 overflow-hidden">
+                  <div className="relative h-48 overflow-hidden">
                     <img 
                       src={product.image_url || 'https://picsum.photos/400/400'} 
                       alt={product.name}
                       className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
                     />
-                    <div className="absolute top-6 left-6">
-                      <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[10px] font-black px-5 py-2.5 rounded-full uppercase tracking-widest shadow-xl border border-pink-50">
+                    <div className="absolute top-3 left-3">
+                      <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-pink-50">
                         {product.category || 'Beauty'}
                       </span>
                     </div>
                   </div>
-                  <div className="p-10 flex flex-col flex-grow">
-                    <h3 className="text-2xl font-black text-gray-900 mb-2 truncate italic tracking-tight">{product.name}</h3>
-                    <p className="text-gray-400 text-sm mb-8 line-clamp-2 leading-relaxed font-medium italic">
-                      {product.description || 'A masterpiece of aesthetic brilliance curated for the modern individual.'}
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h3 className="text-base font-black text-gray-900 mb-1 truncate italic">{product.name}</h3>
+                    <p className="text-xs text-gray-400 mb-3 line-clamp-1 font-medium">
+                      {product.description || 'Premium beauty product'}
                     </p>
                     <div className="mt-auto">
-                      <div className="flex items-center justify-between mb-8">
-                        <span className="text-3xl font-black text-gray-900 tracking-tighter">£{(product.price || 0).toFixed(2)}</span>
-                        <div className="flex items-center gap-2">
-                           <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></div>
-                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">In Stock</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-lg font-black text-gray-900">£{(product.price || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="mb-3">
+                        <div className="bg-green-50/50 text-green-700 text-[8px] py-1 px-2 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">
+                          {product.stock} available
                         </div>
                       </div>
                       <button 
                         onClick={() => handleAddToCart(product)}
                         disabled={addingMap[product.id] || successMap[product.id]}
-                        className={`w-full py-5 rounded-2xl font-black transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 group-hover:translate-y-[-4px] transform ${
+                        className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
                           successMap[product.id] 
-                          ? 'bg-green-500 text-white scale-105' 
+                          ? 'bg-green-500 text-white' 
                           : 'bg-gray-900 hover:bg-pink-600 text-white'
                         }`}
                       >
                         {addingMap[product.id] ? (
-                          <Loader2 className="animate-spin" size={20} />
+                          <Loader2 className="animate-spin" size={14} />
                         ) : successMap[product.id] ? (
                           <>
-                            <Check size={20} /> Added
+                            <Check size={14} /> Added
                           </>
                         ) : (
                           <>
-                            <ShoppingCart size={20} /> Add to Cart
+                            <ShoppingCart size={14} /> Add to Cart
                           </>
                         )}
                       </button>

@@ -37,6 +37,19 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
+    // Check for local backup first
+    const backupWishlist = localStorage.getItem('wishlist_backup');
+    if (backupWishlist) {
+      try {
+        const parsed = JSON.parse(backupWishlist);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setItems(parsed);
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
     setLoading(true);
     try {
       const response = await api.get('/wishlist');
@@ -49,30 +62,37 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         rawItems = data.items || data.wishlist || data.data || data.WishlistItems || [];
       }
 
-      const productsRes = await api.get('/products');
-      const allProducts: Product[] = Array.isArray(productsRes.data) 
-        ? productsRes.data 
-        : (productsRes.data?.products || productsRes.data?.data || []);
+      // Only update if we got actual data from server
+      if (rawItems.length > 0) {
+        const productsRes = await api.get('/products');
+        const allProducts: Product[] = Array.isArray(productsRes.data) 
+          ? productsRes.data 
+          : (productsRes.data?.products || productsRes.data?.data || []);
 
-      const hydratedItems = rawItems.map((item: any) => {
-        const productId = String(item.product_id || item.productId || item.id || item.ID);
-        const productInfo = allProducts.find(p => String(p.id) === productId);
-        
-        return {
-          id: String(item.id || item.ID || `wish-${productId}`),
-          product_id: productId,
-          product: productInfo || item.product || {
-            id: productId,
-            name: item.name || 'Luxury Asset',
-            price: item.price || 0,
-            image_url: item.image_url || ''
-          }
-        };
-      }).filter(Boolean) as WishlistItem[];
+        const hydratedItems = rawItems.map((item: any) => {
+          const productId = String(item.product_id || item.productId || item.id || item.ID);
+          const productInfo = allProducts.find(p => String(p.id) === productId);
+          
+          return {
+            id: String(item.id || item.ID || `wish-${productId}`),
+            product_id: productId,
+            product: productInfo || item.product || {
+              id: productId,
+              name: item.name || 'Luxury Asset',
+              price: item.price || 0,
+              image_url: item.image_url || ''
+            }
+          };
+        }).filter(Boolean) as WishlistItem[];
 
-      setItems(hydratedItems);
+        setItems(hydratedItems);
+        // Update backup
+        localStorage.setItem('wishlist_backup', JSON.stringify(hydratedItems));
+      }
+      // If server returns empty but we have local items, keep local items
     } catch (err: any) {
-      setItems([]);
+      // Keep existing items if API fails
+      console.log('Wishlist fetch failed, keeping local state');
     } finally {
       setLoading(false);
     }
@@ -86,23 +106,31 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const prodId = String(product.id);
     const existingItem = items.find(item => String(item.product_id) === prodId);
 
+    // Always update local state immediately for instant feedback
+    let newItems;
+    if (existingItem) {
+      newItems = items.filter(item => String(item.product_id) !== prodId);
+    } else {
+      const newItem: WishlistItem = {
+        id: isGuest ? `guest-wish-${prodId}` : `wish-${prodId}`,
+        product_id: prodId,
+        product: product
+      };
+      newItems = [...items, newItem];
+    }
+    
+    // Update state immediately
+    setItems(newItems);
+    
     if (isGuest) {
-      let newItems;
-      if (existingItem) {
-        newItems = items.filter(item => String(item.product_id) !== prodId);
-      } else {
-        const newItem: WishlistItem = {
-          id: `guest-wish-${prodId}`,
-          product_id: prodId,
-          product: product
-        };
-        newItems = [...items, newItem];
-      }
-      setItems(newItems);
       localStorage.setItem('guest_wishlist', JSON.stringify(newItems));
       return;
     }
 
+    // Save to localStorage as backup
+    localStorage.setItem('wishlist_backup', JSON.stringify(newItems));
+
+    // Try API call in background
     try {
       if (existingItem) {
         try {
@@ -113,16 +141,19 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } else {
         await api.post('/wishlist/add', { product_id: product.id });
       }
-      await fetchWishlist();
+      // Only refresh from server if API call was successful
+      // Don't call fetchWishlist() to avoid overriding our local state
     } catch (err: any) {
-      // Sync local state as fallback
-      await fetchWishlist();
+      console.error('Wishlist API error:', err);
+      // Keep the local state since we already updated it
+      // Don't call fetchWishlist() as it would override our local changes
     }
   };
 
   const isInWishlist = (productId: string | number) => {
     const searchId = String(productId);
-    return items.some(item => String(item.product_id) === searchId);
+    const found = items.some(item => String(item.product_id) === searchId);
+    return found;
   };
 
   return (

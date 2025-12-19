@@ -7,7 +7,8 @@ import { Order, Product } from '../types';
 import { 
   ShoppingBag, Calendar, Package, ArrowRight, 
   Loader2, CheckCircle2, X, Info, FileText, 
-  User, Mail, ShieldCheck, Hash, Clock, Settings
+  User, Mail, ShieldCheck, Hash, Clock, Settings,
+  Edit, Phone, MapPin, Save
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -15,29 +16,87 @@ const Profile: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Profile editing state
+  const [isEditingShipping, setIsEditingShipping] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName: '',
+    email: user?.email || '',
+    phone: '',
+    accountType: user?.role || 'User',
+    memberSince: new Date().toISOString()
+  });
+  const [shippingAddress, setShippingAddress] = useState({
+    street: '',
+    city: '',
+    postalCode: '',
+    country: 'United Kingdom'
+  });
+  
   // Detail Modal State
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/orders');
-        const data = response.data;
-        const ordersArray = Array.isArray(data) 
-          ? data 
-          : (data?.orders || data?.data || []);
+        // Fetch orders
+        const ordersResponse = await api.get('/orders');
+        const ordersData = ordersResponse.data;
+        const ordersArray = Array.isArray(ordersData) 
+          ? ordersData 
+          : (ordersData?.orders || ordersData?.data || []);
         setOrders(ordersArray);
+
+        // Fetch user profile data and shipping address
+        try {
+          const profileResponse = await api.get('/profile');
+          const profile = profileResponse.data;
+          
+          // Update profile data with fetched API data
+          setProfileData({
+            fullName: profile.name || profile.full_name || '',
+            email: user?.email || profile.email || '', // Email from token is most reliable
+            phone: profile.phone_number || profile.phone || '',
+            accountType: user?.role || profile.role || 'User',
+            memberSince: profile.created_at || new Date().toISOString()
+          });
+          
+          // Fetch shipping address from profile
+          if (profile.shipping_address) {
+            setShippingAddress(profile.shipping_address);
+          }
+        } catch (profileErr) {
+          console.error("Failed to fetch profile data:", profileErr);
+          // If profile fetch fails, we still have email from token
+          setProfileData({
+            fullName: '',
+            email: user?.email || '',
+            phone: '',
+            accountType: user?.role || 'User',
+            memberSince: new Date().toISOString()
+          });
+        }
       } catch (err) {
-        console.error("Failed to fetch order history", err);
+        console.error("Failed to fetch data", err);
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) fetchOrders();
+    if (user) fetchData();
   }, [user]);
+
+
+
+  const saveShippingAddress = async () => {
+    try {
+      await api.put('/profile/shipping', { shipping_address: shippingAddress });
+      setIsEditingShipping(false);
+    } catch (err) {
+      console.error("Failed to update shipping address", err);
+    }
+  };
 
   const viewOrderDetails = async (order: Order) => {
     setSelectedOrder(order);
@@ -65,100 +124,288 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDF2F8]/20 py-20">
+    <div className="min-h-screen bg-[#FDF2F8]/20 py-24">
       <div className="container mx-auto px-4 max-w-6xl">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
-          <div className="text-left">
-            <span className="text-pink-500 font-black tracking-[0.4em] uppercase text-[10px] mb-2 block">Patron Profile</span>
-            <h1 className="text-5xl font-black text-gray-900 italic tracking-tight">Your Journey</h1>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto">
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-pink-50 flex items-center gap-6 flex-1 min-w-[320px]">
-              <div className="w-14 h-14 bg-pink-500 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                 <User size={28} />
+        {/* Header */}
+        <div className="text-center mb-20">
+          <span className="text-pink-500 font-black tracking-[0.4em] uppercase text-[10px] mb-4 block">Patron Profile</span>
+          <h1 className="text-6xl font-black text-gray-900 mb-6 italic tracking-tight">Your Legacy</h1>
+          <p className="text-gray-400 font-medium max-w-2xl mx-auto italic">
+            "Curated excellence begins with understanding your aesthetic journey."
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+          {/* Personal Information Card */}
+          <div className="bg-white rounded-[3rem] p-12 shadow-2xl border border-pink-50 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-pink-50/50 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            
+            <div className="relative z-10">
+              <div className="mb-12">
+                <h2 className="text-3xl font-black text-gray-900 italic mb-3 flex items-center gap-3">
+                  <User className="text-pink-500" size={28} /> Identity Matrix
+                </h2>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Authenticated Credentials</p>
               </div>
-              <div className="text-left">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Authenticated Account</p>
-                <p className="text-lg font-black text-gray-900 truncate max-w-[200px]">{user?.email}</p>
+
+              <div className="space-y-10">
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
+                    <User size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Full Name</p>
+                    <p className="text-xl font-black text-gray-900 italic">
+                      {profileData.fullName || (
+                        <span className="text-gray-400 font-medium text-base">Loading profile data...</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
+                    <Mail size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Digital Concierge</p>
+                    <p className="text-lg font-black text-gray-900 break-all">{profileData.email}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
+                    <Phone size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Direct Line</p>
+                    <p className="text-lg font-black text-gray-900">
+                      {profileData.phone || (
+                        <span className="text-gray-400 font-medium text-base">Loading profile data...</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-8 pt-6 border-t border-pink-50">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Account Classification</p>
+                      <p className="text-sm font-black text-gray-900 uppercase tracking-widest">{profileData.accountType}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Member Since</p>
+                      <p className="text-sm font-black text-gray-900">
+                        {new Date(profileData.memberSince).toLocaleDateString('en-GB', { 
+                          month: 'short', 
+                          year: 'numeric' 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <Link 
-              to="/account-settings" 
-              className="bg-gray-900 hover:bg-pink-600 text-white p-6 rounded-[2rem] shadow-xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+          {/* Shipping Address Card */}
+          <div className="bg-gray-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden group">
+            <div className="absolute bottom-0 right-0 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl -mb-20 -mr-20 group-hover:bg-pink-500/30 transition-all"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-12">
+                <div>
+                  <h2 className="text-3xl font-black italic mb-3 flex items-center gap-3">
+                    <MapPin className="text-pink-500" size={28} /> Delivery Coordinates
+                  </h2>
+                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Fulfillment Address</p>
+                </div>
+                <button
+                  onClick={() => setIsEditingShipping(!isEditingShipping)}
+                  className="bg-white/10 hover:bg-pink-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl flex items-center gap-2"
+                >
+                  <Edit size={16} />
+                  {isEditingShipping ? 'Cancel' : 'Configure'}
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                {isEditingShipping ? (
+                  <>
+                    <div className="space-y-6">
+                      <div>
+                        <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Street Address</label>
+                        <input
+                          type="text"
+                          value={shippingAddress.street}
+                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                          className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
+                          placeholder="Enter your street address"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">City</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.city}
+                            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                            className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
+                            placeholder="Enter your city"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Postal Code</label>
+                          <input
+                            type="text"
+                            value={shippingAddress.postalCode}
+                            onChange={(e) => setShippingAddress({...shippingAddress, postalCode: e.target.value})}
+                            className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
+                            placeholder="Postal code"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Country</label>
+                        <select
+                          value={shippingAddress.country}
+                          onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
+                          className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold"
+                        >
+                          <option value="United Kingdom">United Kingdom</option>
+                          <option value="Ireland">Ireland</option>
+                          <option value="France">France</option>
+                          <option value="Germany">Germany</option>
+                          <option value="Spain">Spain</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      onClick={saveShippingAddress}
+                      className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all flex items-center gap-3"
+                    >
+                      <Save size={18} />
+                      Secure Address
+                    </button>
+                  </>
+                ) : (
+                  <div>
+                    {shippingAddress.street ? (
+                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
+                        <div className="text-white font-bold text-lg leading-relaxed">
+                          <p className="mb-2">{shippingAddress.street}</p>
+                          <p className="mb-2">{shippingAddress.city} {shippingAddress.postalCode}</p>
+                          <p className="text-pink-300 font-black uppercase text-sm tracking-widest">{shippingAddress.country}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center">
+                        <p className="text-white/60 italic font-medium mb-4">No delivery coordinates configured</p>
+                        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Configure address for seamless fulfillment</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-[3rem] p-12 shadow-2xl border border-pink-50 mb-16">
+          <h2 className="text-3xl font-black text-gray-900 italic mb-8 flex items-center gap-3">
+            <Package className="text-pink-500" size={28} /> Patron Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link
+              to="/profile"
+              onClick={() => {
+                const ordersSection = document.getElementById('orders-section');
+                if (ordersSection) ordersSection.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="flex items-center gap-6 p-8 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50"
             >
-              <Settings size={20} /> Manage Protocols
+              <div className="w-16 h-16 bg-pink-500 rounded-2xl flex items-center justify-center group-hover:bg-pink-600 transition-all shadow-lg">
+                <Package size={28} className="text-white" />
+              </div>
+              <div>
+                <p className="text-lg font-black text-gray-900 italic">View Orders</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Acquisition History</p>
+              </div>
+            </Link>
+            
+            <Link
+              to="/shop"
+              className="flex items-center gap-6 p-8 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50"
+            >
+              <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center group-hover:bg-pink-600 transition-all shadow-lg">
+                <ShoppingBag size={28} className="text-white" />
+              </div>
+              <div>
+                <p className="text-lg font-black text-gray-900 italic">Continue Shopping</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Curated Collection</p>
+              </div>
             </Link>
           </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="flex items-center gap-4 mb-2">
-            <Clock size={20} className="text-pink-500" />
-            <h2 className="text-xl font-black text-gray-900 italic">Order Acquisitions</h2>
+        {/* Recent Orders */}
+        <div id="orders-section" className="bg-white rounded-[3rem] p-12 shadow-2xl border border-pink-50">
+          <div className="flex items-center gap-4 mb-12">
+            <Hash size={28} className="text-pink-500" />
+            <h2 className="text-3xl font-black text-gray-900 italic">Recent Acquisitions</h2>
           </div>
-
+          
           {orders.length === 0 ? (
-            <div className="bg-white rounded-[3rem] p-20 text-center shadow-xl border border-pink-50">
-              <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="text-center py-20">
+              <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-8">
                 <ShoppingBag size={32} className="text-pink-200" />
               </div>
-              <p className="text-gray-400 font-bold mb-8">No previous transactions found in your ledger.</p>
+              <p className="text-gray-400 font-bold mb-8 italic">No previous transactions found in your ledger.</p>
               <Link 
                 to="/shop" 
-                className="inline-block bg-gray-900 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-pink-600 transition-all shadow-xl active:scale-95"
+                className="inline-block bg-gray-900 text-white px-12 py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:bg-pink-600 transition-all shadow-2xl active:scale-95"
               >
-                Start Your Curation
+                Begin Your Curation
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6">
-              {orders.map((order) => (
+            <div className="space-y-6">
+              {orders.slice(0, 3).map((order: any) => (
                 <div 
                   key={order.id} 
-                  className="bg-white rounded-[2rem] p-8 shadow-lg border border-pink-50 flex flex-col md:flex-row items-center justify-between gap-8 hover:shadow-2xl transition-all group"
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-8 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50"
                 >
-                  <div className="flex items-center gap-8 text-left w-full md:w-auto">
-                    <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-900 border border-pink-50 shadow-inner group-hover:bg-pink-500 group-hover:text-white transition-all">
+                  <div className="flex items-center gap-6 mb-4 md:mb-0">
+                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-gray-900 border border-pink-100 shadow-inner group-hover:bg-pink-500 group-hover:text-white transition-all">
                       <Hash size={24} />
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Identifier</p>
-                      <p className="text-lg font-black text-gray-900 italic">#{order.id}</p>
+                      <p className="text-xl font-black text-gray-900 italic">#{order.id}</p>
                     </div>
                   </div>
-
-                  <div className="flex flex-col md:flex-row items-center gap-12 w-full md:w-auto">
-                    <div className="text-center md:text-left">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
-                       <span className="text-[10px] font-black px-4 py-1.5 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">
-                         {order.status}
-                       </span>
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-12">
+                    <div className="text-left">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Investment</p>
+                      <p className="text-xl font-black text-gray-900">£{(order.total_amount || 0).toFixed(2)}</p>
                     </div>
-
-                    <div className="text-center md:text-left">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Transaction Value</p>
-                       <p className="text-xl font-black text-gray-900">£{(order.total_amount || 0).toFixed(2)}</p>
+                    <div className="text-left">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                      <span className="text-[10px] font-black px-4 py-2 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">
+                        {order.status}
+                      </span>
                     </div>
-
-                    <div className="text-center md:text-left">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Date</p>
-                       <p className="text-sm font-bold text-gray-500 flex items-center gap-2">
-                         <Calendar size={14} className="text-pink-400" />
-                         {new Date(order.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                       </p>
-                    </div>
-
-                    <button 
-                      onClick={() => viewOrderDetails(order)}
-                      className="bg-gray-900 hover:bg-pink-600 text-white px-8 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all flex items-center gap-2 group-hover:translate-x-1"
-                    >
-                      View Details <ArrowRight size={14} />
-                    </button>
                   </div>
                 </div>
               ))}
+              {orders.length > 3 && (
+                <div className="text-center pt-8">
+                  <button className="text-pink-500 hover:text-pink-600 font-black text-sm uppercase tracking-widest transition-colors">
+                    View Complete Ledger
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

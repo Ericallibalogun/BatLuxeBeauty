@@ -509,6 +509,10 @@ const AdminDashboard: React.FC = () => {
                     <option>Makeup</option>
                     <option>Fragrance</option>
                     <option>Accessories</option>
+                    <option>Nails</option>
+                    <option>Eye Pencil</option>
+                    <option>Lip Gloss</option>
+                    <option>Lip Liner</option>
                   </select>
                 </div>
                 <div className="space-y-2 text-left">

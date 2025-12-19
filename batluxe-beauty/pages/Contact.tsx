@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   Mail, Phone, MapPin, Send, Loader2, 
   MessageSquare, User, AtSign, Globe, CheckCircle2,
-  Instagram, Facebook, Twitter, Clock, Briefcase
+  Clock, Briefcase
 } from 'lucide-react';
 
 const Contact: React.FC = () => {
@@ -180,17 +180,7 @@ const Contact: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-16 pt-10 border-t border-white/5 flex gap-6">
-                <div className="p-3 bg-white/5 rounded-xl hover:bg-pink-500 transition-all cursor-pointer">
-                  <Instagram size={20} />
-                </div>
-                <div className="p-3 bg-white/5 rounded-xl hover:bg-blue-600 transition-all cursor-pointer">
-                  <Twitter size={20} />
-                </div>
-                <div className="p-3 bg-white/5 rounded-xl hover:bg-blue-800 transition-all cursor-pointer">
-                  <Facebook size={20} />
-                </div>
-              </div>
+
             </div>
 
             <div className="bg-white rounded-[2.5rem] p-10 border border-pink-50 shadow-xl">

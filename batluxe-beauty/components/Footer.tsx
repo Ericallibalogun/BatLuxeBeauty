@@ -14,13 +14,13 @@ const Footer: React.FC = () => {
 
   return (
     <footer className="bg-[#1A1A1A] text-white py-16 relative">
-      <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
         <div>
           <h2 className="text-2xl font-bold text-pink-500 mb-6 italic tracking-tight">BatLuxe Beauty</h2>
           <p className="text-gray-400 mb-8 leading-relaxed font-light">
             Glow In Your Own Luxury. We provide premium beauty products curated for your unique style and aesthetic.
           </p>
-          <div className="flex space-x-4">
+          <div className="flex space-x-4 justify-center md:justify-start">
             <a 
               href="https://www.instagram.com/batluxebeautyuk?igsh=MThxdTV4ZXB2cDd3aw%3D%3D&utm_source=qr" 
               target="_blank" 
@@ -66,12 +66,16 @@ const Footer: React.FC = () => {
         <div>
           <h3 className="text-lg font-bold mb-6 uppercase tracking-widest text-pink-400">Contact Us</h3>
           <ul className="space-y-4 text-gray-400 font-medium">
-            <li className="flex items-center gap-2">
+            <li className="flex items-center gap-2 justify-center md:justify-start">
               <span className="text-pink-500">📍</span> London, UK
             </li>
-            <li className="flex items-center gap-2">
+            <li className="flex items-center gap-2 justify-center md:justify-start">
               <span className="text-pink-500">📞</span> 
               <a href="tel:+447707216493" className="hover:text-pink-500 transition-colors">+44 7707 216493</a>
+            </li>
+            <li className="flex items-center gap-2 justify-center md:justify-start">
+              <span className="text-pink-500">✉️</span>
+              <a href="mailto:Batluxebeauty@gmail.com" className="hover:text-pink-500 transition-colors">Batluxebeauty@gmail.com</a>
             </li>
             <li><Link to="/shipping" className="hover:text-pink-500 transition-colors">Shipping & Returns</Link></li>
             <li><Link to="/privacy" className="hover:text-pink-500 transition-colors">Privacy Policy</Link></li>

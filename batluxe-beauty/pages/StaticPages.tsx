@@ -74,7 +74,7 @@ export const ShippingPolicy: React.FC = () => (
           </div>
           <div>
             <h3 className="text-[12px] font-black text-gray-900 uppercase tracking-widest mb-3">Damaged Items</h3>
-            <p className="text-gray-500 font-medium italic leading-relaxed mb-4">Contact us within 48 hours at <span className="text-pink-600 font-black">hello@batluxebeauty.com</span> with your name, order number, and clear photos.</p>
+            <p className="text-gray-500 font-medium italic leading-relaxed mb-4">Contact us within 48 hours at <a href="mailto:Batluxebeauty@gmail.com" className="text-pink-600 font-black">Batluxebeauty@gmail.com</a> with your name, order number, and clear photos.</p>
           </div>
         </div>
       </section>
@@ -114,7 +114,7 @@ export const PrivacyPolicy: React.FC = () => (
 
       <section className="bg-gray-50 p-8 rounded-[2rem] border border-pink-50">
         <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-3">Your Rights (UK GDPR)</h3>
-        <p className="text-gray-600 text-sm font-medium italic leading-relaxed">You have the right to access, correct, delete, or restrict your personal data. Contact us at <span className="text-pink-600 font-black">info@batluxebeauty.com</span> to exercise these rights.</p>
+        <p className="text-gray-600 text-sm font-medium italic leading-relaxed">You have the right to access, correct, delete, or restrict your personal data. Contact us at <a href="mailto:Batluxebeauty@gmail.com" className="text-pink-600 font-black">Batluxebeauty@gmail.com</a> to exercise these rights.</p>
       </section>
     </div>
   </div>

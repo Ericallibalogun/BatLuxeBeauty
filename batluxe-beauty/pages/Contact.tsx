@@ -155,7 +155,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Direct Line</p>
-                    <p className="text-xl font-black tracking-tight">+44 (0) 20 7946 0123</p>
+                    <a href="tel:+447707216493" className="text-xl font-black tracking-tight hover:text-pink-400 transition-colors">+44 7707 216493</a>
                   </div>
                 </div>
 
@@ -165,7 +165,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Digital Concierge</p>
-                    <p className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">info@batluxebeauty.com</p>
+                    <a href="mailto:Batluxebeauty@gmail.com" className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">Batluxebeauty@gmail.com</a>
                   </div>
                 </div>
 
@@ -175,7 +175,7 @@ const Contact: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Partnerships</p>
-                    <p className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">partners@batluxebeauty.com</p>
+                    <a href="mailto:Batluxebeauty@gmail.com" className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">Batluxebeauty@gmail.com</a>
                   </div>
                 </div>
               </div>

@@ -168,16 +168,6 @@ const Contact: React.FC = () => {
                     <a href="mailto:Batluxebeauty@gmail.com" className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">Batluxebeauty@gmail.com</a>
                   </div>
                 </div>
-
-                <div className="flex items-start gap-6">
-                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
-                    <Briefcase size={24} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Partnerships</p>
-                    <a href="mailto:Batluxebeauty@gmail.com" className="text-lg font-black text-white hover:text-pink-400 transition-colors cursor-pointer">Batluxebeauty@gmail.com</a>
-                  </div>
-                </div>
               </div>
 
 

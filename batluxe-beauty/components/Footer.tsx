@@ -56,10 +56,10 @@ const Footer: React.FC = () => {
         <div>
           <h3 className="text-lg font-bold mb-6 uppercase tracking-widest text-pink-400">Quick Links</h3>
           <ul className="space-y-4 text-gray-400 font-medium">
-            <li><Link to="/" className="hover:text-pink-500 transition-colors">Home</Link></li>
-            <li><Link to="/shop" className="hover:text-pink-500 transition-colors">Shop</Link></li>
-            <li><Link to="/about" className="hover:text-pink-500 transition-colors">About Us</Link></li>
-            <li><Link to="/contact" className="hover:text-pink-500 transition-colors">Contact</Link></li>
+            <li><Link to="/" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Home</Link></li>
+            <li><Link to="/shop" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Shop</Link></li>
+            <li><Link to="/about" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">About Us</Link></li>
+            <li><Link to="/contact" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Contact</Link></li>
           </ul>
         </div>
 
@@ -77,10 +77,10 @@ const Footer: React.FC = () => {
               <span className="text-pink-500">✉️</span>
               <a href="mailto:Batluxebeauty@gmail.com" className="hover:text-pink-500 transition-colors">Batluxebeauty@gmail.com</a>
             </li>
-            <li><Link to="/shipping" className="hover:text-pink-500 transition-colors">Shipping & Returns</Link></li>
-            <li><Link to="/privacy" className="hover:text-pink-500 transition-colors">Privacy Policy</Link></li>
-            <li><Link to="/terms" className="hover:text-pink-500 transition-colors">Terms & Conditions</Link></li>
-            <li><Link to="/faqs" className="hover:text-pink-500 transition-colors">FAQ</Link></li>
+            <li><Link to="/shipping" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Shipping & Returns</Link></li>
+            <li><Link to="/privacy" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Privacy Policy</Link></li>
+            <li><Link to="/terms" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">Terms & Conditions</Link></li>
+            <li><Link to="/faqs" onClick={scrollToTop} className="hover:text-pink-500 transition-colors">FAQ</Link></li>
           </ul>
         </div>
       </div>

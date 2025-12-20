@@ -159,8 +159,7 @@ const Contact: React.FC = () => {
                   </div>
                 </div>
 
-     do u know what this is how i did it , login after login get products then u move to order so u use a product id wen u want to order so the response u get u pick the id of ur order then add it to that url it wud work           <div className="flex items-start gap-6">
-                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
+                <div className="flex items-start gap-6">
                     <Mail size={24} />
                   </div>
                   <div>

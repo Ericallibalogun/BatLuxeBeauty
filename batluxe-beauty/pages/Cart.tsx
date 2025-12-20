@@ -49,49 +49,27 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
     setProcessing(true);
 
     try {
-      // Check if this is a real Stripe client_secret (starts with pi_)
-      if (clientSecret.startsWith('pi_') && !clientSecret.includes('demo')) {
-        console.log('Real Stripe payment processing');
-        
-        if (!stripe || !elements) {
-          throw new Error('Stripe not loaded');
-        }
-        
-        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-          payment_method: {
-            card: elements.getElement(CardElement)!,
-            billing_details: {
-              email: user?.email,
-              name: user?.email?.split('@')[0] || 'Customer'
-            }
+      if (!stripe || !elements) {
+        throw new Error('Stripe not loaded');
+      }
+      
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement)!,
+          billing_details: {
+            email: user?.email,
+            name: user?.email?.split('@')[0] || 'Customer'
           }
-        });
-
-        if (error) {
-          console.error('Payment error:', error.message);
-          onError(error.message || 'Payment failed');
-        } else if (paymentIntent.status === 'succeeded') {
-          console.log('Payment succeeded!');
-          onSuccess();
         }
-        return;
-      }
-      
-      // Fallback to demo mode for demo client_secrets
-      if (clientSecret.includes('demo')) {
-        console.log('Demo mode: Simulating successful payment');
-        
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        console.log('Demo payment succeeded!');
+      });
+
+      if (error) {
+        console.error('Payment error:', error.message);
+        onError(error.message || 'Payment failed');
+      } else if (paymentIntent.status === 'succeeded') {
+        console.log('Payment succeeded!');
         onSuccess();
-        return;
       }
-      
-      // If we get here, something is wrong with the client_secret
-      throw new Error('Invalid payment configuration');
-      
     } catch (err: any) {
       console.error('Payment processing error:', err);
       onError(err.message || 'Payment processing failed');
@@ -100,66 +78,7 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
     }
   };
 
-  // Show real Stripe form for real client_secrets, demo form for demo client_secrets
-  const isRealStripePayment = clientSecret.startsWith('pi_') && !clientSecret.includes('demo');
-
-  if (!isRealStripePayment && clientSecret.includes('demo')) {
-    // Demo mode - show demo card form
-    return (
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-gray-50 p-6 rounded-2xl border border-pink-50">
-          <label className="block text-sm font-black text-gray-700 mb-4 uppercase tracking-widest">
-            Demo Payment (Backend Integration Pending)
-          </label>
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="4242 4242 4242 4242"
-              className="w-full p-4 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-mono"
-              disabled
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="12/25"
-                className="w-full p-4 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-mono"
-                disabled
-              />
-              <input
-                type="text"
-                placeholder="123"
-                className="w-full p-4 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-mono"
-                disabled
-              />
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-4 font-medium">
-            Demo mode: This will simulate a successful payment for testing purposes.
-          </p>
-        </div>
-        
-        <button 
-          type="submit"
-          disabled={processing}
-          className="w-full bg-gray-900 hover:bg-pink-600 text-white py-6 rounded-2xl font-black shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
-        >
-          {processing ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              Processing Demo Payment...
-            </>
-          ) : (
-            <>
-              <Lock size={20} />
-              Complete Demo Payment
-            </>
-          )}
-        </button>
-      </form>
-    );
-  }
-
-  // Real Stripe form (when backend provides real client_secret)
+  // Real Stripe form
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-gray-50 p-6 rounded-2xl border border-pink-50">
@@ -413,40 +332,9 @@ const Cart: React.FC = () => {
         console.error('Payment initialization error:', payErr);
         console.error('Error response data:', payErr.response?.data);
         console.error('Error status:', payErr.response?.status);
-        console.error('Error headers:', payErr.response?.headers);
         
         const status = payErr.response?.status;
         const backendError = payErr.response?.data?.error || payErr.response?.data?.message;
-        
-        // Handle different error scenarios
-        if (status === 500) {
-          // Check if it's a Stripe amount error
-          const errorData = payErr.response?.data?.error;
-          if (typeof errorData === 'string' && errorData.includes('amount_too_small')) {
-            console.log('Stripe amount error detected');
-            console.log('This suggests a currency conversion issue in the backend');
-            console.log('Order total:', total + selectedShipping.fee, 'GBP');
-            
-            // For now, fall back to demo mode
-            const demoClientSecret = `pi_demo_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`;
-            setClientSecret(demoClientSecret);
-            setCheckoutStep('payment_form');
-            return;
-          }
-          
-          console.log('Backend 500 error - this should work in Postman');
-          console.log('Possible issues: Authorization header, Content-Type, or Order ID format');
-          console.log('Order ID being used:', orderId);
-          console.log('Token being used:', localStorage.getItem('token')?.substring(0, 20) + '...');
-          
-          // Create a demo client secret to test the Stripe integration
-          const demoClientSecret = `pi_demo_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`;
-          
-          console.log('Demo mode: Frontend Stripe integration will work once backend is fixed');
-          setClientSecret(demoClientSecret);
-          setCheckoutStep('payment_form');
-          return;
-        }
         
         if (status === 401) {
           throw new Error(`Authentication Error: Please log in again.`);
@@ -799,7 +687,7 @@ const Cart: React.FC = () => {
                     <Elements 
                       stripe={stripePromise}
                       options={{
-                        clientSecret: clientSecret.includes('demo') ? undefined : clientSecret,
+                        clientSecret: clientSecret,
                         appearance: {
                           theme: 'stripe',
                           variables: {

@@ -53,9 +53,14 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
         throw new Error('Stripe not loaded');
       }
       
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+      
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
-          card: elements.getElement(CardElement)!,
+          card: cardElement as any,
           billing_details: {
             email: user?.email,
             name: user?.email?.split('@')[0] || 'Customer'

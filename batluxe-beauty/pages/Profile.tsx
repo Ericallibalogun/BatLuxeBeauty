@@ -213,16 +213,16 @@ const Profile: React.FC = () => {
             <div className="absolute bottom-0 right-0 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl -mb-20 -mr-20 group-hover:bg-pink-500/30 transition-all"></div>
             
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-12">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-12">
                 <div>
-                  <h2 className="text-3xl font-black italic mb-3 flex items-center gap-3">
-                    <MapPin className="text-pink-500" size={28} /> Delivery Coordinates
+                  <h2 className="text-2xl sm:text-3xl font-black italic mb-3 flex items-center gap-3">
+                    <MapPin className="text-pink-500 flex-shrink-0" size={28} /> Delivery Coordinates
                   </h2>
                   <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Fulfillment Address</p>
                 </div>
                 <button
                   onClick={() => setIsEditingShipping(!isEditingShipping)}
-                  className="bg-white/10 hover:bg-pink-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl flex items-center gap-2"
+                  className="bg-white/10 hover:bg-pink-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 flex-shrink-0 self-start sm:self-auto"
                 >
                   <Edit size={16} />
                   {isEditingShipping ? 'Cancel' : 'Configure'}

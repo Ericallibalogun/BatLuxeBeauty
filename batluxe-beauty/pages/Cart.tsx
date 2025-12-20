@@ -745,21 +745,24 @@ const Cart: React.FC = () => {
                       </div>
 
                       {/* Submit Buttons - Make sure they're visible */}
-                      <div className="flex gap-4 pt-6 pb-4">
-                        <button 
+                      <div className="flex gap-3 pt-6 pb-4">
+                        <button
                           type="button"
-                          onClick={() => { setCheckingOut(false); setCheckoutStep('idle'); }}
-                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-3"
+                          onClick={() => {
+                            setCheckingOut(false);
+                            setCheckoutStep('idle');
+                          }}
+                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 px-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                         >
-                          <ChevronLeft size={20} />
-                          Back to Cart
+                          <ChevronLeft size={16} />
+                          <span>Back</span>
                         </button>
-                        <button 
+                        <button
                           type="submit"
-                          className="flex-1 bg-gray-900 hover:bg-pink-600 text-white py-4 rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-3 text-lg"
+                          className="flex-[2] bg-gray-900 hover:bg-pink-600 text-white py-3 px-4 rounded-2xl font-bold text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
                         >
-                          Complete Order
-                          <ArrowRight size={20} />
+                          <span>Complete Order</span>
+                          <ArrowRight size={16} />
                         </button>
                       </div>
                     </form>
@@ -851,51 +854,53 @@ const Cart: React.FC = () => {
             {items.map((item) => (
               <div 
                 key={item.id} 
-                className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-pink-50 flex flex-col md:flex-row items-center gap-8 group hover:shadow-2xl transition-all"
+                className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-xl border border-pink-50 group hover:shadow-2xl transition-all"
               >
-                <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg bg-gray-50 border border-pink-50">
-                  <img 
-                    src={item.product?.image_url || 'https://picsum.photos/200/200'} 
-                    alt={item.product?.name} 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
+                <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg bg-gray-50 border border-pink-50">
+                    <img 
+                      src={item.product?.image_url || 'https://picsum.photos/200/200'} 
+                      alt={item.product?.name} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                  </div>
+                  <div className="flex-grow text-center sm:text-left min-w-0">
+                    <span className="text-pink-500 text-[10px] font-black uppercase tracking-widest mb-1 block">
+                      {item.product?.category || 'Beauty'}
+                    </span>
+                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 italic mb-2 truncate">{item.product?.name}</h3>
+                    <p className="text-gray-400 text-sm font-medium line-clamp-1 max-w-md">
+                      {item.product?.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-grow text-center md:text-left">
-                  <span className="text-pink-500 text-[10px] font-black uppercase tracking-widest mb-1 block">
-                    {item.product?.category || 'Beauty'}
-                  </span>
-                  <h3 className="text-2xl font-black text-gray-900 italic mb-2 truncate">{item.product?.name}</h3>
-                  <p className="text-gray-400 text-sm font-medium line-clamp-1 max-w-md">
-                    {item.product?.description}
-                  </p>
-                </div>
-                <div className="flex items-center gap-8 flex-shrink-0">
-                  <div className="flex items-center bg-gray-50 p-2 rounded-2xl border border-pink-50">
+                <div className="flex items-center justify-between gap-4 mt-6 pt-6 border-t border-pink-50 sm:border-0 sm:pt-0 sm:mt-0 sm:justify-end">
+                  <div className="flex items-center bg-gray-50 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl border border-pink-50">
                     <button 
                       onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                      className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-pink-600 transition-colors"
+                      className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-pink-500 hover:text-pink-600 transition-colors"
                       disabled={item.quantity <= 1}
                     >
                       <Minus size={16} />
                     </button>
-                    <span className="w-12 text-center font-black text-gray-900">{item.quantity}</span>
+                    <span className="w-8 sm:w-12 text-center font-black text-gray-900">{item.quantity}</span>
                     <button 
                       onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                      className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-pink-600 transition-colors"
+                      className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-pink-500 hover:text-pink-600 transition-colors"
                     >
                       <Plus size={16} />
                     </button>
                   </div>
-                  <div className="text-right min-w-[120px]">
-                    <p className="text-2xl font-black text-gray-900 tracking-tight">
+                  <div className="text-right">
+                    <p className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                       £{((item.product?.price || 0) * item.quantity).toFixed(2)}
                     </p>
                   </div>
                   <button 
                     onClick={() => removeFromCart(item.id)}
-                    className="p-4 text-gray-300 hover:text-red-500 transition-colors hover:bg-red-50 rounded-2xl"
+                    className="p-3 sm:p-4 text-gray-300 hover:text-red-500 transition-colors hover:bg-red-50 rounded-xl sm:rounded-2xl flex-shrink-0"
                   >
-                    <Trash2 size={20} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>

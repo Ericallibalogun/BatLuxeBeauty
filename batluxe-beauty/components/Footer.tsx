@@ -64,8 +64,15 @@ const Footer: React.FC = () => {
         </div>
 
         <div>
-          <h3 className="text-lg font-bold mb-6 uppercase tracking-widest text-pink-400">Customer Service</h3>
+          <h3 className="text-lg font-bold mb-6 uppercase tracking-widest text-pink-400">Contact Us</h3>
           <ul className="space-y-4 text-gray-400 font-medium">
+            <li className="flex items-center gap-2">
+              <span className="text-pink-500">📍</span> London, UK
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-pink-500">📞</span> 
+              <a href="tel:+447707216493" className="hover:text-pink-500 transition-colors">+44 7707 216493</a>
+            </li>
             <li><Link to="/shipping" className="hover:text-pink-500 transition-colors">Shipping & Returns</Link></li>
             <li><Link to="/privacy" className="hover:text-pink-500 transition-colors">Privacy Policy</Link></li>
             <li><Link to="/terms" className="hover:text-pink-500 transition-colors">Terms & Conditions</Link></li>

@@ -160,6 +160,7 @@ const Contact: React.FC = () => {
                 </div>
 
                 <div className="flex items-start gap-6">
+                  <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-pink-500 shadow-inner">
                     <Mail size={24} />
                   </div>
                   <div>

@@ -51,7 +51,7 @@ export const ShippingPolicy: React.FC = () => (
             </div>
             <div className="bg-gray-50 p-6 rounded-2xl border border-pink-50">
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Delivery Times</h3>
-              <p className="font-bold text-gray-900">Standard delivery usually takes 3–5 working days after dispatch.</p>
+              <p className="font-bold text-gray-900">Standard delivery usually takes 1–3 working days after dispatch.</p>
             </div>
           </div>
           <div className="bg-pink-50/50 p-8 rounded-3xl border border-pink-100 flex items-start gap-4">

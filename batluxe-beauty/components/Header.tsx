@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 /* Added Clock to the imported icons from lucide-react */
-import { User, LogOut, ShieldCheck, ChevronDown, UserCircle, ShoppingCart, Heart, Settings, Clock } from 'lucide-react';
+import { User, LogOut, ShieldCheck, ChevronDown, UserCircle, ShoppingCart, Heart, Clock } from 'lucide-react';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -82,9 +82,6 @@ const Header: React.FC = () => {
                     </div>
                     <Link to="/profile" onClick={() => setDropdownOpen(false)} className="flex items-center px-6 py-3 text-gray-700 hover:bg-pink-50 font-bold">
                       <Clock size={18} className="mr-4" /> My Dashboard
-                    </Link>
-                    <Link to="/account-settings" onClick={() => setDropdownOpen(false)} className="flex items-center px-6 py-3 text-gray-700 hover:bg-pink-50 font-bold">
-                      <Settings size={18} className="mr-4" /> Account Protocols
                     </Link>
                     <Link to="/wishlist" onClick={() => setDropdownOpen(false)} className="flex items-center px-6 py-3 text-gray-700 hover:bg-pink-50 font-bold">
                       <Heart size={18} className="mr-4" /> My Wishlist

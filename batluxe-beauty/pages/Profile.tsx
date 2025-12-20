@@ -50,8 +50,8 @@ const Profile: React.FC = () => {
 
         // Fetch user profile data and shipping address
         try {
-          const profileResponse = await api.get('/profile');
-          const profile = profileResponse.data;
+          const profileResponse = await api.get('/users/me');
+          const profile = profileResponse.data.user; // API returns { user: {...} }
           
           // Update profile data with fetched API data
           setProfileData({

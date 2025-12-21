@@ -15,7 +15,7 @@ const About: React.FC = () => {
           <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-[2px]"></div>
         </div>
         <div className="relative z-10 max-w-4xl px-4">
-          <span className="text-white font-black tracking-[0.5em] uppercase text-xs mb-4 block">Est. 2020</span>
+          <span className="text-white font-black tracking-[0.5em] uppercase text-xs mb-4 block">Est. 2025</span>
           <h1 className="text-6xl md:text-8xl font-black text-white italic tracking-tighter mb-6">Our Story</h1>
           <p className="text-xl text-white/90 font-medium italic tracking-widest uppercase">From Passion to Premium Beauty</p>
         </div>
@@ -29,7 +29,7 @@ const About: React.FC = () => {
               <h2 className="text-4xl font-black text-gray-900 italic tracking-tight">Discover the passion behind BatLuxe Beauty</h2>
               <div className="w-20 h-1.5 bg-pink-500 rounded-full"></div>
               <p className="text-gray-500 text-lg leading-relaxed font-medium italic">
-                BatLuxe Beauty was born from a simple yet powerful vision: to create luxury beauty products that empower women to express their unique identity with confidence and style. Founded in 2020 by beauty enthusiast Bat, our brand has grown from a small passion project to a beloved beauty destination.
+                BatLuxe Beauty was born from a simple yet powerful vision: to create luxury beauty products that empower women to express their unique identity with confidence and style. Founded in 2025 by beauty enthusiast Bat, our brand has grown from a small passion project to a beloved beauty destination.
               </p>
               <p className="text-gray-500 text-lg leading-relaxed font-medium italic">
                 What started as handmade lip glosses created in a small kitchen has evolved into a full range of premium beauty products, each crafted with the same attention to detail and commitment to quality that defined our humble beginnings.

@@ -88,9 +88,9 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
 
   // Real Stripe form
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-gray-50 p-6 rounded-2xl border border-pink-50">
-        <label className="block text-sm font-black text-gray-700 mb-4 uppercase tracking-widest">
+    <form onSubmit={handleSubmit} className="space-y-6 w-full">
+      <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
+        <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
           Card Details
         </label>
         {!stripe || !elements ? (
@@ -99,19 +99,29 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
             <span className="text-gray-500 font-medium">Loading secure payment form...</span>
           </div>
         ) : (
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: '16px',
-                  color: '#111827',
-                  fontFamily: 'Poppins, sans-serif',
-                  '::placeholder': { color: '#9CA3AF' },
-                },
-                invalid: { color: '#EF4444' },
-              },
-            }}
-          />
+          <div className="w-full">
+            <div className="bg-white rounded-xl border border-gray-200 min-h-[60px] w-full" style={{ width: '100%' }}>
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#111827',
+                      fontFamily: 'Poppins, sans-serif',
+                      lineHeight: '40px',
+                      padding: '20px 24px',
+                      width: '100%',
+                      '::placeholder': { color: '#9CA3AF' },
+                    },
+                    invalid: { color: '#EF4444' },
+                  },
+                  hidePostalCode: false,
+                }}
+                className="w-full"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
         )}
       </div>
       
@@ -306,18 +316,62 @@ const Cart: React.FC = () => {
           country: shippingData.shipping_address.country,
           postal_code: shippingData.shipping_address.postal_code
         },
-        shipping_fee: selectedShipping.fee,
-        shipping_type: selectedShipping.type,
-        currency: "GBP", // Explicitly set currency to British Pounds
-        total_amount: total + selectedShipping.fee, // Total in GBP
+        shipping_fee: selectedShipping.fee, // Send it even though backend ignores it
         items: items.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity
+          // Backend will fetch product details and calculate prices
         }))
       };
 
+      console.log('Creating order with payload:', orderPayload);
+      console.log('Cart total:', total, 'Shipping fee:', selectedShipping.fee, 'Final total:', total + selectedShipping.fee);
+      console.log('Cart items:', items.map(item => ({ 
+        name: item.product?.name, 
+        price: item.product?.price, 
+        quantity: item.quantity,
+        product_id: item.product_id
+      })));
+
       const orderResponse = await api.post('/orders', orderPayload);
       const orderData = orderResponse.data;
+      
+      console.log('Order creation response:', orderData);
+      console.log('Created order total_price:', orderData.total_price);
+      console.log('Created order subtotal:', orderData.subtotal);
+      console.log('Created order shipping_fee:', orderData.shipping_fee);
+
+      // Store the shipping fee locally since backend doesn't store it properly
+      const orderId = orderData.id || orderData.ID || orderData._id;
+      if (orderId) {
+        const orderShippingData = {
+          orderId: orderId,
+          shippingFee: selectedShipping.fee,
+          shippingType: selectedShipping.type,
+          timestamp: Date.now()
+        };
+        
+        // Get existing shipping data
+        const existingData = localStorage.getItem('order_shipping_fees');
+        const shippingFees = existingData ? JSON.parse(existingData) : {};
+        
+        // Add this order's shipping fee
+        shippingFees[orderId] = orderShippingData;
+        
+        // Store back to localStorage
+        localStorage.setItem('order_shipping_fees', JSON.stringify(shippingFees));
+        
+        // Clean up old entries (older than 30 days)
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        Object.keys(shippingFees).forEach(id => {
+          if (shippingFees[id].timestamp < thirtyDaysAgo) {
+            delete shippingFees[id];
+          }
+        });
+        localStorage.setItem('order_shipping_fees', JSON.stringify(shippingFees));
+        
+        console.log('Stored shipping fee for order:', orderShippingData);
+      }
 
       const rawOrderId = orderData.id || 
                          orderData.ID || 
@@ -538,8 +592,8 @@ const Cart: React.FC = () => {
     <div className="min-h-screen bg-[#FDF2F8]/20 py-20 relative overflow-hidden text-left text-gray-900">
       {/* Checkout Processing Overlay */}
       {checkingOut && (
-        <div className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300 overflow-y-auto">
-          <div className="w-full max-w-md bg-white rounded-[3rem] p-10 shadow-2xl border border-pink-50 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 md:p-6 animate-in fade-in duration-300 overflow-y-auto">
+          <div className="w-full max-w-xl bg-white rounded-[3rem] p-8 md:p-10 shadow-2xl border border-pink-50 relative max-h-[90vh] overflow-y-auto">
             {checkoutStep === 'success' ? (
               <div className="text-center animate-in zoom-in duration-500">
                 <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-green-100">
@@ -846,8 +900,17 @@ const Cart: React.FC = () => {
                             colorText: '#111827',
                             colorDanger: '#ef4444',
                             fontFamily: 'Poppins, sans-serif',
-                            spacingUnit: '4px',
-                            borderRadius: '16px',
+                            spacingUnit: '6px',
+                            borderRadius: '12px',
+                          },
+                          rules: {
+                            '.Input': {
+                              padding: '20px 24px',
+                              width: '100%',
+                            },
+                            '.Input--focus': {
+                              boxShadow: '0 0 0 2px #ec4899',
+                            },
                           },
                         },
                       }}

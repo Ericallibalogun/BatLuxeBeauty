@@ -36,6 +36,89 @@ const Profile: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showAllOrders, setShowAllOrders] = useState(false);
+
+  // Helper function to get stored shipping fee for an order
+  const getStoredShippingFee = (orderId: string) => {
+    try {
+      const existingData = localStorage.getItem('order_shipping_fees');
+      if (existingData) {
+        const shippingFees = JSON.parse(existingData);
+        const storedFee = shippingFees[orderId]?.shippingFee;
+        if (storedFee && storedFee > 0) {
+          return storedFee;
+        }
+      }
+    } catch (error) {
+      console.error('Error reading stored shipping fees:', error);
+    }
+    // Default to standard shipping if not found
+    return 2.99;
+  };
+
+  // Helper function to calculate order total from items
+  const calculateOrderTotal = (order: any, items: any[] = []) => {
+    console.log('calculateOrderTotal called with:', { 
+      order: order, 
+      items: items,
+      total_price: order?.total_price,
+      subtotal: order?.subtotal,
+      shipping_fee: order?.shipping_fee
+    });
+    
+    // Backend uses 'total_price' but doesn't include shipping
+    if (order.total_price && order.total_price > 0) {
+      const storedShipping = getStoredShippingFee(order.id);
+      const totalWithShipping = order.total_price + storedShipping;
+      console.log('Using total_price + stored shipping:', { 
+        total_price: order.total_price, 
+        shipping: storedShipping, 
+        total: totalWithShipping 
+      });
+      return totalWithShipping;
+    }
+    
+    // Check if we have subtotal (backend calculated)
+    if (order.subtotal && order.subtotal > 0) {
+      const storedShipping = getStoredShippingFee(order.id);
+      const backendTotal = order.subtotal + storedShipping;
+      console.log('Using subtotal + stored shipping:', { 
+        subtotal: order.subtotal, 
+        shipping: storedShipping, 
+        total: backendTotal 
+      });
+      return backendTotal;
+    }
+    
+    // Calculate from items if available
+    if (items && items.length > 0) {
+      const itemsTotal = items.reduce((sum, item) => {
+        const price = item.price || item.product?.price || 0;
+        const quantity = item.quantity || 1;
+        return sum + (price * quantity);
+      }, 0);
+      const estimatedShipping = getStoredShippingFee(order.id);
+      const calculatedTotal = itemsTotal + estimatedShipping;
+      console.log('Calculated from items + shipping:', { itemsTotal, shipping: estimatedShipping, calculatedTotal });
+      return calculatedTotal;
+    }
+    
+    // If no items but we have order data, try to extract from order
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      const itemsTotal = order.items.reduce((sum: number, item: any) => {
+        const price = item.price || 0;
+        const quantity = item.quantity || 1;
+        return sum + (price * quantity);
+      }, 0);
+      const estimatedShipping = getStoredShippingFee(order.id);
+      const calculatedTotal = itemsTotal + estimatedShipping;
+      console.log('Calculated from order.items + shipping:', { itemsTotal, shipping: estimatedShipping, calculatedTotal });
+      return calculatedTotal;
+    }
+    
+    console.log('No valid total found, returning 0');
+    return 0;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,9 +126,20 @@ const Profile: React.FC = () => {
         // Fetch orders
         const ordersResponse = await api.get('/orders');
         const ordersData = ordersResponse.data;
-        const ordersArray = Array.isArray(ordersData) 
-          ? ordersData 
-          : (ordersData?.orders || ordersData?.data || []);
+        console.log('Raw orders response:', ordersData);
+        
+        // Backend returns { orders: [...] }
+        const ordersArray = ordersData?.orders || (Array.isArray(ordersData) ? ordersData : []);
+        console.log('Parsed orders array:', ordersArray);
+        
+        // Log first order to see structure
+        if (ordersArray.length > 0) {
+          console.log('First order structure:', ordersArray[0]);
+          console.log('First order total_price:', ordersArray[0].total_price);
+          console.log('First order subtotal:', ordersArray[0].subtotal);
+          console.log('First order shipping_fee:', ordersArray[0].shipping_fee);
+        }
+        
         setOrders(ordersArray);
 
         // Fetch user profile data and shipping address
@@ -105,7 +199,41 @@ const Profile: React.FC = () => {
     try {
       const response = await api.get(`/orders/${order.id}`);
       const data = response.data;
-      const items = data.items || data.order_items || data.OrderItems || [];
+      console.log('Order details response:', data);
+      
+      // Backend returns { order: {...} }
+      const orderData = data.order || data;
+      console.log('Order data:', orderData);
+      
+      let items = orderData.items || [];
+      console.log('Order items:', items);
+      
+      // Items from backend already have product_name and price
+      // But we can still hydrate with full product info if needed
+      if (items.length > 0) {
+        const productsRes = await api.get('/products');
+        const products = Array.isArray(productsRes.data) 
+          ? productsRes.data 
+          : (productsRes.data?.products || productsRes.data?.data || []);
+        
+        // Enhance items with full product information
+        items = items.map((item: any) => {
+          const productId = item.product_id;
+          const productInfo = products.find((p: any) => p.id === productId);
+          
+          return {
+            ...item,
+            product: productInfo || {
+              id: productId,
+              name: item.product_name || 'Product',
+              price: item.price || 0,
+              image_url: 'https://picsum.photos/200/200'
+            }
+          };
+        });
+      }
+      
+      console.log('Enhanced items:', items);
       setOrderItems(Array.isArray(items) ? items : []);
     } catch (err) {
       console.error("Error fetching detailed order info", err);
@@ -371,24 +499,25 @@ const Profile: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {orders.slice(0, 3).map((order: any) => (
+              {(showAllOrders ? orders : orders.slice(0, 3)).map((order: any) => (
                 <div 
                   key={order.id} 
-                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-8 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50"
+                  onClick={() => viewOrderDetails(order)}
+                  className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 md:p-8 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50 cursor-pointer"
                 >
-                  <div className="flex items-center gap-6 mb-4 md:mb-0">
-                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-gray-900 border border-pink-100 shadow-inner group-hover:bg-pink-500 group-hover:text-white transition-all">
-                      <Hash size={24} />
+                  <div className="flex items-start gap-4 md:gap-6 mb-4 md:mb-0 w-full md:w-auto min-w-0">
+                    <div className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-2xl flex items-center justify-center text-gray-900 border border-pink-100 shadow-inner group-hover:bg-pink-500 group-hover:text-white transition-all flex-shrink-0">
+                      <Hash size={20} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Identifier</p>
-                      <p className="text-xl font-black text-gray-900 italic">#{order.id}</p>
+                      <p className="text-lg md:text-xl font-black text-gray-900 italic break-all">#{order.id}</p>
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-12">
                     <div className="text-left">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Investment</p>
-                      <p className="text-xl font-black text-gray-900">£{(order.total_amount || 0).toFixed(2)}</p>
+                      <p className="text-xl font-black text-gray-900">£{calculateOrderTotal(order).toFixed(2)}</p>
                     </div>
                     <div className="text-left">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
@@ -401,8 +530,11 @@ const Profile: React.FC = () => {
               ))}
               {orders.length > 3 && (
                 <div className="text-center pt-8">
-                  <button className="text-pink-500 hover:text-pink-600 font-black text-sm uppercase tracking-widest transition-colors">
-                    View Complete Ledger
+                  <button 
+                    onClick={() => setShowAllOrders(!showAllOrders)}
+                    className="text-pink-500 hover:text-pink-600 font-black text-sm uppercase tracking-widest transition-colors"
+                  >
+                    {showAllOrders ? 'Show Less' : 'View Complete Ledger'}
                   </button>
                 </div>
               )}
@@ -413,23 +545,23 @@ const Profile: React.FC = () => {
 
       {/* Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setSelectedOrder(null)}></div>
           <div className="relative w-full max-w-3xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col max-h-[85vh]">
-            <div className="p-10 border-b flex justify-between items-center bg-gray-900 text-white">
-              <div className="flex items-center gap-4 text-left">
-                <div className="w-12 h-12 bg-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
-                   <Package size={24} />
+            <div className="p-6 md:p-10 border-b flex justify-between items-center bg-gray-900 text-white">
+              <div className="flex items-center gap-3 md:gap-4 text-left min-w-0 flex-1 mr-4">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-500 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                   <Package size={20} className="md:w-6 md:h-6" />
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black italic">Details for #{selectedOrder.id}</h2>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg md:text-xl font-black italic break-all">Details for #{selectedOrder.id}</h2>
                   <p className="text-pink-300 text-[10px] font-black uppercase tracking-widest">Acquisition Receipt</p>
                 </div>
               </div>
               <button onClick={() => setSelectedOrder(null)} className="text-white/50 hover:text-white transition-colors bg-white/10 p-2 rounded-xl"><X size={24} /></button>
             </div>
             
-            <div className="p-10 overflow-y-auto space-y-10">
+            <div className="p-6 md:p-10 overflow-y-auto space-y-8 md:space-y-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                  <div className="bg-gray-50 p-6 rounded-3xl border border-pink-50 text-left">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Shipment Status</p>
@@ -440,7 +572,7 @@ const Profile: React.FC = () => {
                  </div>
                  <div className="bg-gray-50 p-6 rounded-3xl border border-pink-50 text-left">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Total Investment</p>
-                    <p className="text-2xl font-black text-gray-900">£{(selectedOrder.total_amount || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-black text-gray-900">£{calculateOrderTotal(selectedOrder, orderItems).toFixed(2)}</p>
                  </div>
               </div>
 
@@ -468,11 +600,41 @@ const Profile: React.FC = () => {
                         <tbody className="divide-y divide-pink-50">
                           {orderItems.map((item, idx) => (
                             <tr key={idx}>
-                              <td className="px-8 py-5 font-bold text-gray-900 italic">{item.product_name || item.name || 'Bespoke Item'}</td>
-                              <td className="px-8 py-5 text-center font-black text-gray-400">{item.quantity}</td>
-                              <td className="px-8 py-5 text-right font-black text-gray-900">£{(item.price || 0).toFixed(2)}</td>
+                              <td className="px-8 py-5 font-bold text-gray-900 italic">
+                                {item.product?.name || item.product_name || item.name || 'Luxury Product'}
+                              </td>
+                              <td className="px-8 py-5 text-center font-black text-gray-400">{item.quantity || 1}</td>
+                              <td className="px-8 py-5 text-right font-black text-gray-900">
+                                £{((item.product?.price || item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                              </td>
                             </tr>
                           ))}
+                          {orderItems.length > 0 && (
+                            <>
+                              <tr className="border-t-2 border-pink-100">
+                                <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Subtotal</td>
+                                <td className="px-8 py-4 text-right font-black text-gray-900">
+                                  £{orderItems.reduce((sum, item) => {
+                                    const price = item.product?.price || item.price || 0;
+                                    const quantity = item.quantity || 1;
+                                    return sum + (price * quantity);
+                                  }, 0).toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Shipping</td>
+                                <td className="px-8 py-4 text-right font-black text-gray-900">
+                                  £{getStoredShippingFee(selectedOrder.id).toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr className="border-t-2 border-pink-200 bg-pink-50">
+                                <td className="px-8 py-5 font-black text-gray-900 uppercase text-xs tracking-widest" colSpan={2}>Total</td>
+                                <td className="px-8 py-5 text-right font-black text-pink-600 text-lg">
+                                  £{calculateOrderTotal(selectedOrder, orderItems).toFixed(2)}
+                                </td>
+                              </tr>
+                            </>
+                          )}
                         </tbody>
                       </table>
                     ) : (

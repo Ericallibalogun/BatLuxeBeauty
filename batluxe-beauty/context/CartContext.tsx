@@ -62,11 +62,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cartRes = await api.get('/cart');
       const cartData = cartRes.data;
       
+      // Backend returns { cart_items: [...] }
       let rawItems = [];
-      if (Array.isArray(cartData)) {
+      if (cartData && cartData.cart_items) {
+        rawItems = cartData.cart_items;
+      } else if (Array.isArray(cartData)) {
         rawItems = cartData;
       } else if (cartData && typeof cartData === 'object') {
-        rawItems = cartData.items || cartData.cart_items || cartData.data || [];
+        rawItems = cartData.items || cartData.data || [];
       }
 
       const productsRes = await api.get('/products');

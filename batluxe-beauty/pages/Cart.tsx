@@ -440,6 +440,12 @@ const Cart: React.FC = () => {
       try {
         setError('Refreshing payment session...');
         
+        // Clear current clientSecret first to force Elements unmount
+        setClientSecret(null);
+        
+        // Small delay to ensure Elements is properly unmounted
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Automatically renew the payment session
         const payResponse = await api.post(`/orders/${orderId}/pay`, {}, {
           headers: {
@@ -824,7 +830,9 @@ const Cart: React.FC = () => {
                     )}
 
                     {/* Stripe Elements Provider (as per backend specs) */}
+                    {/* Force re-render when clientSecret changes by using key */}
                     <Elements 
+                      key={clientSecret} // This forces re-render when clientSecret changes
                       stripe={stripePromise}
                       options={{
                         clientSecret: clientSecret,

@@ -68,7 +68,7 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
         // Sanitize error message to avoid exposing payment intent IDs
         let userFriendlyError = error.message || 'Payment failed';
         if (userFriendlyError.includes('payment_intent')) {
-          userFriendlyError = 'Payment session expired. Please start a new checkout.';
+          userFriendlyError = 'Payment session expired. Refreshing session...';
         }
         onError(userFriendlyError);
       } else if (paymentIntent.status === 'succeeded') {
@@ -186,6 +186,38 @@ const Cart: React.FC = () => {
 
   // Calculate total with shipping
   const totalWithShipping = total + selectedShipping.fee;
+
+  // Session timeout handling - refresh payment session before it expires
+  useEffect(() => {
+    if (!clientSecret || !orderId) return;
+
+    // Stripe payment intents typically expire after 24 hours
+    // Refresh after 20 minutes to be safe
+    const refreshTimer = setTimeout(async () => {
+      if (checkoutStep === 'payment_form') {
+        try {
+          console.log('Proactively refreshing payment session...');
+          const payResponse = await api.post(`/orders/${orderId}/pay`, {}, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const newClientSecret = payResponse.data.client_secret;
+          if (newClientSecret) {
+            setClientSecret(newClientSecret);
+            console.log('Payment session refreshed successfully');
+          }
+        } catch (error) {
+          console.error('Proactive session refresh failed:', error);
+          // Don't show error to user for proactive refresh
+        }
+      }
+    }, 20 * 60 * 1000); // 20 minutes
+
+    return () => clearTimeout(refreshTimer);
+  }, [clientSecret, orderId, checkoutStep]);
 
   // Fetch user profile and auto-populate shipping form
   useEffect(() => {
@@ -394,9 +426,46 @@ const Cart: React.FC = () => {
     setTimeout(() => navigate('/profile'), 2500);
   };
 
-  // Payment error handler
+  // Payment error handler with automatic session renewal
   const handlePaymentError = async (errorMessage: string) => {
     setError(errorMessage);
+    
+    // Check if this is a session expiration error
+    const isSessionExpired = errorMessage.includes('payment session expired') || 
+                            errorMessage.includes('payment_intent') ||
+                            errorMessage.includes('expired') ||
+                            errorMessage.includes('invalid');
+    
+    if (isSessionExpired && orderId) {
+      try {
+        setError('Refreshing payment session...');
+        
+        // Automatically renew the payment session
+        const payResponse = await api.post(`/orders/${orderId}/pay`, {}, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const newClientSecret = payResponse.data.client_secret;
+        if (newClientSecret) {
+          setClientSecret(newClientSecret);
+          setError(null);
+          setCheckoutStep('payment_form');
+          return; // Stay on payment form with fresh session
+        }
+        
+      } catch (renewError: any) {
+        console.error('Payment session renewal failed:', renewError);
+        setError('Unable to refresh payment session. Please try checkout again.');
+        setCheckoutStep('shipping_form');
+        setClientSecret(null);
+        return;
+      }
+    }
+    
+    // For non-session errors, stay on payment form
     setCheckoutStep('payment_form');
     
     // Process webhook for payment failure
@@ -731,7 +800,13 @@ const Cart: React.FC = () => {
                         <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <span>{error}</span>
-                          {error.includes('payment session expired') && (
+                          {error.includes('Refreshing payment session') && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                              <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Updating payment session automatically...</span>
+                            </div>
+                          )}
+                          {error.includes('payment session expired') && !error.includes('Refreshing') && (
                             <button
                               onClick={() => {
                                 setCheckingOut(false);

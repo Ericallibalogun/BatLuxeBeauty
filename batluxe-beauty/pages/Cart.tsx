@@ -64,7 +64,12 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
 
       if (error) {
         console.error('Payment processing failed');
-        onError(error.message || 'Payment failed');
+        // Sanitize error message to avoid exposing payment intent IDs
+        let userFriendlyError = error.message || 'Payment failed';
+        if (userFriendlyError.includes('payment_intent')) {
+          userFriendlyError = 'Payment session expired. Please start a new checkout.';
+        }
+        onError(userFriendlyError);
       } else if (paymentIntent.status === 'succeeded') {
         onSuccess();
       }
@@ -666,7 +671,22 @@ const Cart: React.FC = () => {
                     {error && (
                       <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-2xl mb-6 flex items-start gap-3 text-xs font-bold leading-relaxed">
                         <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                        <span>{error}</span>
+                        <div className="flex-1">
+                          <span>{error}</span>
+                          {error.includes('payment session expired') && (
+                            <button
+                              onClick={() => {
+                                setCheckingOut(false);
+                                setCheckoutStep('idle');
+                                setError(null);
+                                setClientSecret(null);
+                              }}
+                              className="block mt-3 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded-lg font-bold transition-colors"
+                            >
+                              Start New Checkout
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 

@@ -144,7 +144,7 @@ const Contact: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Physical Atelier</p>
                     <p className="text-lg font-bold italic opacity-90 leading-relaxed">
-                      15 Curated Lane,<br />Mayfair, London<br />W1K 7LU, United Kingdom
+                      London
                     </p>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWebhook } from '../context/WebhookContext';
 import { 
   Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, 
   ShieldCheck, CreditCard, Lock, Check, AlertCircle, 
@@ -134,6 +135,7 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
 const Cart: React.FC = () => {
   const { items, total, count, updateQuantity, removeFromCart, loading, clearCart } = useCart();
   const { user } = useAuth();
+  const { processPaymentSuccess, processPaymentFailure } = useWebhook();
   const navigate = useNavigate();
   
   // Checkout & Payment State
@@ -360,14 +362,70 @@ const Cart: React.FC = () => {
   // Payment success handler (following backend specs)
   const handlePaymentSuccess = async () => {
     setCheckoutStep('success');
+    
+    // Process webhook for payment success
+    if (orderId && clientSecret) {
+      try {
+        const webhookPayload = {
+          orderId: orderId,
+          paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+          amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+          currency: 'gbp',
+          customerEmail: user?.email,
+          metadata: {
+            items: items.map(item => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            shipping: selectedShipping
+          }
+        };
+        
+        await processPaymentSuccess(webhookPayload);
+      } catch (webhookError) {
+        console.error('Webhook processing failed:', webhookError);
+        // Don't block the success flow if webhook fails
+      }
+    }
+    
     await clearCart();
     setTimeout(() => navigate('/profile'), 2500);
   };
 
   // Payment error handler
-  const handlePaymentError = (errorMessage: string) => {
+  const handlePaymentError = async (errorMessage: string) => {
     setError(errorMessage);
     setCheckoutStep('payment_form');
+    
+    // Process webhook for payment failure
+    if (orderId && clientSecret) {
+      try {
+        const webhookPayload = {
+          orderId: orderId,
+          paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+          amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+          currency: 'gbp',
+          customerEmail: user?.email,
+          metadata: {
+            error: errorMessage,
+            items: items.map(item => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            shipping: selectedShipping
+          }
+        };
+        
+        await processPaymentFailure(webhookPayload);
+      } catch (webhookError) {
+        console.error('Webhook processing failed:', webhookError);
+        // Don't interfere with error display if webhook fails
+      }
+    }
   };
 
   if (loading && items.length === 0) {

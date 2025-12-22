@@ -15,9 +15,13 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 
 /**
  * STRIPE CONFIGURATION:
- * Using test key for localhost development (works with HTTP)
+ * Using live key for production transactions
  */
-const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_TYooMQauvdEDq54NiTphI7jx";
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+if (!STRIPE_PUBLISHABLE_KEY) {
+  console.error('VITE_STRIPE_PUBLISHABLE_KEY is not set in environment variables');
+}
 
 // Initialize Stripe Promise (as per backend specs)
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
@@ -397,29 +401,28 @@ const Cart: React.FC = () => {
     
     // Process webhook for payment success
     if (orderId && clientSecret) {
-      try {
-        const webhookPayload = {
-          orderId: orderId,
-          paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
-          amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
-          currency: 'gbp',
-          customerEmail: user?.email,
-          metadata: {
-            items: items.map(item => ({
-              id: item.id,
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price
-            })),
-            shipping: selectedShipping
-          }
-        };
-        
-        await processPaymentSuccess(webhookPayload);
-      } catch (webhookError) {
+      const webhookPayload = {
+        orderId: orderId,
+        paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+        amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+        currency: 'gbp',
+        customerEmail: user?.email,
+        metadata: {
+          items: items.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          shipping: selectedShipping
+        }
+      };
+      
+      // Process webhook asynchronously without blocking success flow
+      processPaymentSuccess(webhookPayload).catch(webhookError => {
         console.error('Webhook processing failed:', webhookError);
-        // Don't block the success flow if webhook fails
-      }
+        // Don't interfere with success flow if webhook fails
+      });
     }
     
     await clearCart();
@@ -476,30 +479,29 @@ const Cart: React.FC = () => {
     
     // Process webhook for payment failure
     if (orderId && clientSecret) {
-      try {
-        const webhookPayload = {
-          orderId: orderId,
-          paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
-          amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
-          currency: 'gbp',
-          customerEmail: user?.email,
-          metadata: {
-            error: errorMessage,
-            items: items.map(item => ({
-              id: item.id,
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price
-            })),
-            shipping: selectedShipping
-          }
-        };
-        
-        await processPaymentFailure(webhookPayload);
-      } catch (webhookError) {
+      const webhookPayload = {
+        orderId: orderId,
+        paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+        amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+        currency: 'gbp',
+        customerEmail: user?.email,
+        metadata: {
+          error: errorMessage,
+          items: items.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          shipping: selectedShipping
+        }
+      };
+      
+      // Process webhook asynchronously without blocking error handling
+      processPaymentFailure(webhookPayload).catch(webhookError => {
         console.error('Webhook processing failed:', webhookError);
         // Don't interfere with error display if webhook fails
-      }
+      });
     }
   };
 

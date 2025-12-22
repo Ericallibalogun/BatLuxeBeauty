@@ -177,9 +177,9 @@ const Cart: React.FC = () => {
     customer_phone: '',
     shipping_address: {
       street: '',
-      city: '',
-      state: '',
-      country: 'Nigeria',
+      city: 'London',
+      state: 'Greater London',
+      country: 'United Kingdom',
       postal_code: ''
     }
   });
@@ -484,7 +484,7 @@ const Cart: React.FC = () => {
                             value={shippingData.customer_phone}
                             onChange={(e) => setShippingData(prev => ({ ...prev, customer_phone: e.target.value }))}
                             className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-                            placeholder="08012345678"
+                            placeholder="+44 7XXX XXXXXX"
                             required
                           />
                         </div>
@@ -502,7 +502,7 @@ const Cart: React.FC = () => {
                             shipping_address: { ...prev.shipping_address, street: e.target.value }
                           }))}
                           className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-                          placeholder="12 Allen Avenue"
+                          placeholder="123 Oxford Street"
                           required
                         />
                       </div>
@@ -520,7 +520,7 @@ const Cart: React.FC = () => {
                               shipping_address: { ...prev.shipping_address, city: e.target.value }
                             }))}
                             className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-                            placeholder="Ikeja"
+                            placeholder="London"
                             required
                           />
                         </div>
@@ -536,7 +536,7 @@ const Cart: React.FC = () => {
                               shipping_address: { ...prev.shipping_address, state: e.target.value }
                             }))}
                             className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-                            placeholder="Lagos"
+                            placeholder="Greater London"
                             required
                           />
                         </div>
@@ -556,10 +556,7 @@ const Cart: React.FC = () => {
                             className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
                             required
                           >
-                            <option value="Nigeria">Nigeria</option>
                             <option value="United Kingdom">United Kingdom</option>
-                            <option value="United States">United States</option>
-                            <option value="Canada">Canada</option>
                           </select>
                         </div>
                         <div>
@@ -574,7 +571,7 @@ const Cart: React.FC = () => {
                               shipping_address: { ...prev.shipping_address, postal_code: e.target.value }
                             }))}
                             className="w-full p-4 border border-pink-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium"
-                            placeholder="100001"
+                            placeholder="SW1A 1AA"
                             required
                           />
                         </div>

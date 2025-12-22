@@ -21,10 +21,6 @@ const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "p
 // Initialize Stripe Promise (as per backend specs)
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
-// Debug Stripe loading
-console.log('Stripe Key:', STRIPE_PUBLISHABLE_KEY);
-console.log('Stripe Promise:', stripePromise);
-
 // Stripe Checkout Form Component (following backend specs exactly)
 const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onError: (error: string) => void }> = ({ 
   clientSecret, 
@@ -38,9 +34,7 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
 
   // Debug Stripe Elements loading
   useEffect(() => {
-    console.log('Stripe instance:', stripe);
-    console.log('Elements instance:', elements);
-    console.log('Client secret:', clientSecret);
+    // Stripe elements loaded - ready for payment processing
   }, [stripe, elements, clientSecret]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,14 +63,13 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
       });
 
       if (error) {
-        console.error('Payment error:', error.message);
+        console.error('Payment processing failed');
         onError(error.message || 'Payment failed');
       } else if (paymentIntent.status === 'succeeded') {
-        console.log('Payment succeeded!');
         onSuccess();
       }
     } catch (err: any) {
-      console.error('Payment processing error:', err);
+      console.error('Payment processing failed');
       onError(err.message || 'Payment processing failed');
     } finally {
       setProcessing(false);
@@ -305,8 +298,7 @@ const Cart: React.FC = () => {
       setCheckoutStep('syncing');
       
       try {
-        console.log('Initializing payment for order:', orderId);
-        console.log('Request URL:', `/orders/${orderId}/pay`);
+        console.log('Initializing payment for order');
         console.log('Authorization token:', localStorage.getItem('token') ? 'Present' : 'Missing');
         
         // STEP 1: INITIALIZE PAYMENT (BACKEND CALL) - as per backend specs
@@ -317,8 +309,6 @@ const Cart: React.FC = () => {
           }
         });
         
-        console.log('Payment response:', payResponse.data);
-        
         // Extract client_secret (REQUIRED for Stripe payment)
         const clientSecret = payResponse.data.client_secret;
         
@@ -327,16 +317,13 @@ const Cart: React.FC = () => {
         }
         
         console.log('Payment intent initialized successfully');
-        console.log('Client secret received from backend');
         
         // Store client_secret in state (as per backend specs)
         setClientSecret(clientSecret);
         setCheckoutStep('payment_form');
         
       } catch (payErr: any) {
-        console.error('Payment initialization error:', payErr);
-        console.error('Error response data:', payErr.response?.data);
-        console.error('Error status:', payErr.response?.status);
+        console.error('Payment initialization failed');
         
         const status = payErr.response?.status;
         const backendError = payErr.response?.data?.error || payErr.response?.data?.message;
@@ -353,7 +340,7 @@ const Cart: React.FC = () => {
       }
 
     } catch (err: any) {
-      console.error("Payment initiation protocol failure:", err);
+      console.error("Payment initiation failed");
       let errorMessage = "Connection to secure vault timed out.";
       
       // Use the actual error message from the payment initialization
@@ -367,7 +354,6 @@ const Cart: React.FC = () => {
 
   // Payment success handler (following backend specs)
   const handlePaymentSuccess = async () => {
-    console.log('Payment succeeded - backend webhook will handle order update');
     setCheckoutStep('success');
     await clearCart();
     setTimeout(() => navigate('/profile'), 2500);
@@ -375,7 +361,6 @@ const Cart: React.FC = () => {
 
   // Payment error handler
   const handlePaymentError = (errorMessage: string) => {
-    console.error('Payment failed:', errorMessage);
     setError(errorMessage);
     setCheckoutStep('payment_form');
   };
@@ -674,7 +659,7 @@ const Cart: React.FC = () => {
                     <div className="mb-8 text-left">
                       <h2 className="text-3xl font-black text-gray-900 italic mb-2 tracking-tight">Secure Payment</h2>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
-                        Investment Value: <span className="text-pink-500 font-black">£{total.toFixed(2)}</span>
+                        Investment Value: <span className="text-pink-500 font-black">£{(total + selectedShipping.fee).toFixed(2)}</span>
                       </p>
                     </div>
 

@@ -19,6 +19,9 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
  */
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
+console.log('Stripe Key Available:', !!STRIPE_PUBLISHABLE_KEY);
+console.log('Stripe Key Prefix:', STRIPE_PUBLISHABLE_KEY?.substring(0, 10));
+
 if (!STRIPE_PUBLISHABLE_KEY) {
   console.error('VITE_STRIPE_PUBLISHABLE_KEY is not set in environment variables');
 }
@@ -35,12 +38,37 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
+  const [stripeLoadTimeout, setStripeLoadTimeout] = useState(false);
   const { user } = useAuth();
 
   // Debug Stripe Elements loading
   useEffect(() => {
-    // Stripe elements loaded - ready for payment processing
+    console.log('Stripe Elements Status:', {
+      stripe: !!stripe,
+      elements: !!elements,
+      clientSecret: !!clientSecret,
+      stripeLoaded: stripe !== null,
+      elementsLoaded: elements !== null
+    });
+    
+    if (stripe && elements) {
+      console.log('Stripe Elements fully loaded and ready');
+    } else {
+      console.log('Waiting for Stripe Elements to load...');
+    }
   }, [stripe, elements, clientSecret]);
+
+  // Timeout mechanism for Stripe loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!stripe || !elements) {
+        console.error('Stripe Elements failed to load within 10 seconds');
+        setStripeLoadTimeout(true);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [stripe, elements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +124,22 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
         {!stripe || !elements ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 text-pink-500 animate-spin mr-3" />
-            <span className="text-gray-500 font-medium">Loading secure payment form...</span>
+            <div className="text-center">
+              <span className="text-gray-500 font-medium block">Loading secure payment form...</span>
+              {stripeLoadTimeout && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-yellow-700 font-medium">
+                    Payment form is taking longer than expected. 
+                    <button 
+                      onClick={() => window.location.reload()} 
+                      className="ml-2 underline hover:no-underline"
+                    >
+                      Refresh page
+                    </button>
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="w-full">

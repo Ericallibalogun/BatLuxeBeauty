@@ -451,7 +451,7 @@ const Cart: React.FC = () => {
     if (orderId && clientSecret) {
       const webhookPayload = {
         orderId: orderId,
-        paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+        paymentIntentId: clientSecret?.split('_secret_')[0] || 'unknown', // Extract payment intent ID safely
         amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
         currency: 'gbp',
         customerEmail: user?.email,
@@ -529,7 +529,7 @@ const Cart: React.FC = () => {
     if (orderId && clientSecret) {
       const webhookPayload = {
         orderId: orderId,
-        paymentIntentId: clientSecret.split('_secret_')[0], // Extract payment intent ID
+        paymentIntentId: clientSecret?.split('_secret_')[0] || 'unknown', // Extract payment intent ID safely
         amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
         currency: 'gbp',
         customerEmail: user?.email,

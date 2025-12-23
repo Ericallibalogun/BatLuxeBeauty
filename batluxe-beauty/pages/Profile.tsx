@@ -97,33 +97,69 @@ const Profile: React.FC = () => {
         
         setOrders(ordersArray);
 
-        // Use user data from JWT token instead of fetching from API
-        // since /users/me endpoint doesn't exist
-        setProfileData({
-          fullName: user?.email?.split('@')[0] || 'User', // Use email prefix as name
-          email: user?.email || '',
-          phone: '', // Will be populated from order data if available
-          accountType: user?.role || 'User',
-          memberSince: new Date().toISOString() // Default to current date
-        });
+        // Fetch user profile data from the API
+        try {
+          console.log('Attempting to fetch profile from /users/me...');
+          const profileResponse = await api.get('/users/me');
+          console.log('Profile API response:', profileResponse.data);
+          
+          // Handle different possible response structures
+          const profile = profileResponse.data?.user || profileResponse.data;
+          
+          if (profile) {
+            console.log('Profile data found:', profile);
+            setProfileData({
+              fullName: profile.name || profile.full_name || profile.customer_name || user?.email?.split('@')[0] || 'User',
+              email: user?.email || profile.email || '',
+              phone: profile.phone_number || profile.phone || profile.customer_phone || '',
+              accountType: user?.role || profile.role || 'User',
+              memberSince: profile.created_at || profile.createdAt || new Date().toISOString()
+            });
+            
+            // Set shipping address from profile if available
+            if (profile.shipping_address) {
+              setShippingAddress(profile.shipping_address);
+            }
+          } else {
+            console.log('No profile data in response, using fallback');
+            // Fallback to JWT token data
+            setProfileData({
+              fullName: user?.email?.split('@')[0] || 'User',
+              email: user?.email || '',
+              phone: '',
+              accountType: user?.role || 'User',
+              memberSince: new Date().toISOString()
+            });
+          }
+        } catch (profileErr) {
+          console.error("Failed to fetch profile data:", profileErr);
+          console.log('Error details:', {
+            status: profileErr.response?.status,
+            statusText: profileErr.response?.statusText,
+            data: profileErr.response?.data
+          });
+          
+          // Fallback: Use JWT token data and try to get info from orders
+          setProfileData({
+            fullName: user?.email?.split('@')[0] || 'User',
+            email: user?.email || '',
+            phone: '',
+            accountType: user?.role || 'User',
+            memberSince: new Date().toISOString()
+          });
+        }
 
-        // Try to get user info from the first order if available
+        // Try to get additional user info from the first order if profile API failed
         if (ordersArray.length > 0) {
           const firstOrder = ordersArray[0];
-          if (firstOrder.customer_name) {
-            setProfileData(prev => ({
-              ...prev,
-              fullName: firstOrder.customer_name
-            }));
-          }
-          if (firstOrder.customer_phone) {
-            setProfileData(prev => ({
-              ...prev,
-              phone: firstOrder.customer_phone
-            }));
-          }
-          // Set shipping address from the most recent order
-          if (firstOrder.shipping_address) {
+          setProfileData(prev => ({
+            ...prev,
+            fullName: prev.fullName === 'User' && firstOrder.customer_name ? firstOrder.customer_name : prev.fullName,
+            phone: !prev.phone && firstOrder.customer_phone ? firstOrder.customer_phone : prev.phone
+          }));
+          
+          // Set shipping address from the most recent order if not set from profile
+          if (!shippingAddress.street && firstOrder.shipping_address) {
             setShippingAddress(firstOrder.shipping_address);
           }
         }

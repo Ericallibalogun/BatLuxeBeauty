@@ -3,17 +3,5 @@
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.batluxebeauty.com"
-        }
-      ],
-      "destination": "https://batluxebeauty.com/$1",
-      "permanent": true
-    }
-  ]
+  "framework": "vite"
 }

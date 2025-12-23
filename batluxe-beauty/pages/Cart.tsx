@@ -342,7 +342,16 @@ const Cart: React.FC = () => {
       console.log('Created order shipping_fee:', orderData.shipping_fee);
 
       // Store the shipping fee locally since backend doesn't store it properly
-      const orderId = orderData.id || orderData.ID || orderData._id;
+      const rawOrderId = orderData.id || orderData.ID || orderData._id;
+      
+      if (!rawOrderId) {
+        throw new Error("Order created, but the server did not return a valid resource identifier.");
+      }
+
+      // Don't clean the order ID - use it as returned by the backend
+      const orderId = String(rawOrderId).trim();
+      setOrderId(orderId);
+      
       if (orderId) {
         const orderShippingData = {
           orderId: orderId,
@@ -372,21 +381,6 @@ const Cart: React.FC = () => {
         
         console.log('Stored shipping fee for order:', orderShippingData);
       }
-
-      const rawOrderId = orderData.id || 
-                         orderData.ID || 
-                         orderData.order_id || 
-                         orderData._id || 
-                         orderData.data?.id || 
-                         orderData.data?._id;
-
-      if (!rawOrderId) {
-        throw new Error("Order created, but the server did not return a valid resource identifier.");
-      }
-
-      // Don't clean the order ID - use it as returned by the backend
-      const orderId = String(rawOrderId).trim();
-      setOrderId(orderId);
       
       console.log('Order created successfully:', orderId);
       console.log('Full order response:', orderData);

@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, Heart, Filter, Loader2, Check } from 'lucide-react';
 import api from '../services/api';
 import { Product } from '../types';
@@ -7,6 +8,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
 const Shop: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -117,9 +119,12 @@ const Shop: React.FC = () => {
             ))
           ) : filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <div key={product.id} className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl transition-all border border-pink-50 flex flex-col relative">
+              <div key={product.id} className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-pink-50 flex flex-col relative cursor-pointer">
                 <button 
-                  onClick={() => handleToggleWishlist(product)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleWishlist(product);
+                  }}
                   disabled={wishlistLoading[product.id]}
                   className={`absolute top-3 right-3 z-10 w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-md shadow-md transition-all active:scale-90 border border-white/20 ${
                     wishlistLoading[product.id] 
@@ -140,7 +145,10 @@ const Shop: React.FC = () => {
                   )}
                 </button>
 
-                <div className="relative h-48 overflow-hidden">
+                <div 
+                  className="relative h-48 overflow-hidden"
+                  onClick={() => navigate(`/product/${product.id}`)}
+                >
                   <img 
                     src={product.image_url || 'https://picsum.photos/400/400'} 
                     alt={product.name}
@@ -151,9 +159,18 @@ const Shop: React.FC = () => {
                       {product.category || 'Beauty'}
                     </span>
                   </div>
+                  {/* Click indicator overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-xs font-bold text-gray-900">
+                      View Details
+                    </div>
+                  </div>
                 </div>
-                <div className="p-4 flex flex-col flex-grow">
-                  <h3 className="text-base font-black text-gray-900 mb-1 italic truncate">{product.name}</h3>
+                <div 
+                  className="p-4 flex flex-col flex-grow"
+                  onClick={() => navigate(`/product/${product.id}`)}
+                >
+                  <h3 className="text-base font-black text-gray-900 mb-1 italic truncate group-hover:text-pink-600 transition-colors">{product.name}</h3>
                   <p className="text-lg font-black text-pink-500 mb-2">£{(product.price || 0).toFixed(2)}</p>
                   
                   <div className="mb-3">
@@ -165,7 +182,10 @@ const Shop: React.FC = () => {
                       {product.stock} available
                     </div>
                     <button 
-                      onClick={() => handleAddToCart(product)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(product);
+                      }}
                       disabled={addingMap[product.id] || successMap[product.id]}
                       className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
                         successMap[product.id] 

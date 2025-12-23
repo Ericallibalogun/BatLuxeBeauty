@@ -27,6 +27,10 @@ const AdminDashboard: React.FC = () => {
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
 
+  // Status Update State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -88,7 +92,83 @@ const AdminDashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Helper function to calculate order total from API data
+  // Helper functions for localStorage status management
+  const getStoredStatusOverride = (orderId: string): string | null => {
+    try {
+      const overrides = localStorage.getItem('order_status_overrides');
+      if (overrides) {
+        const parsed = JSON.parse(overrides);
+        return parsed[orderId] || null;
+      }
+    } catch (error) {
+      console.error('Error reading status overrides:', error);
+    }
+    return null;
+  };
+
+  const setStoredStatusOverride = (orderId: string, newStatus: string) => {
+    try {
+      const existing = localStorage.getItem('order_status_overrides');
+      const overrides = existing ? JSON.parse(existing) : {};
+      overrides[orderId] = newStatus;
+      localStorage.setItem('order_status_overrides', JSON.stringify(overrides));
+    } catch (error) {
+      console.error('Error storing status override:', error);
+    }
+  };
+
+  const getEffectiveOrderStatus = (order: any): string => {
+    const override = getStoredStatusOverride(order.id);
+    return override || order.status;
+  };
+
+  const isStatusOverridden = (orderId: string): boolean => {
+    return getStoredStatusOverride(orderId) !== null;
+  };
+
+  // Available status options
+  const statusOptions = [
+    { value: 'Pending', label: 'Pending', color: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
+    { value: 'Processing', label: 'Processing', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+    { value: 'Shipped', label: 'Shipped', color: 'bg-purple-50 text-purple-600 border-purple-100' },
+    { value: 'Delivered', label: 'Delivered', color: 'bg-green-50 text-green-600 border-green-100' },
+    { value: 'Cancelled', label: 'Cancelled', color: 'bg-red-50 text-red-600 border-red-100' }
+  ];
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(true);
+    try {
+      // Store the status override locally
+      setStoredStatusOverride(orderId, newStatus);
+      
+      // Update the viewing order if it's the current one
+      if (viewingOrder && viewingOrder.id === orderId) {
+        setViewingOrder({
+          ...viewingOrder,
+          status: newStatus
+        });
+      }
+      
+      // Update the orders list
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      );
+      
+      setShowStatusModal(false);
+      
+      // Show success feedback (you could add a toast notification here)
+      console.log(`Order ${orderId} status updated to ${newStatus}`);
+      
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
   const calculateOrderTotal = (order: any) => {
     // Priority 1: Use total_price from backend (most reliable)
     if (order.total_price && order.total_price > 0) {
@@ -459,9 +539,21 @@ const AdminDashboard: React.FC = () => {
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-black text-gray-900">£{calculateOrderTotal(order).toFixed(2)}</p>
-                          <span className="text-[8px] font-black px-3 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">
-                            {order.status}
-                          </span>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className={`text-[8px] font-black px-3 py-1 rounded-full border uppercase tracking-widest ${
+                              getEffectiveOrderStatus(order) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                              getEffectiveOrderStatus(order) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                              getEffectiveOrderStatus(order) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                              getEffectiveOrderStatus(order) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
+                              getEffectiveOrderStatus(order) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                              'bg-blue-50 text-blue-600 border-blue-100'
+                            }`}>
+                              {getEffectiveOrderStatus(order)}
+                            </span>
+                            {isStatusOverridden(order.id) && (
+                              <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse"></div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -550,7 +642,21 @@ const AdminDashboard: React.FC = () => {
                         <div className="text-[10px] text-gray-400">{o.customer_email}</div>
                       </td>
                       <td className="px-10 py-6">
-                        <span className="text-[10px] font-black px-3 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">{o.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest ${
+                            getEffectiveOrderStatus(o) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                            getEffectiveOrderStatus(o) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                            getEffectiveOrderStatus(o) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                            getEffectiveOrderStatus(o) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
+                            getEffectiveOrderStatus(o) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                            'bg-blue-50 text-blue-600 border-blue-100'
+                          }`}>
+                            {getEffectiveOrderStatus(o)}
+                          </span>
+                          {isStatusOverridden(o.id) && (
+                            <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" title="Status updated locally"></div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-10 py-6 font-black text-gray-900">£{calculateOrderTotal(o).toFixed(2)}</td>
                       <td className="px-10 py-6 text-right">
@@ -772,9 +878,24 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <div className="text-left">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current State</p>
-                          <span className="text-[10px] font-black px-4 py-1.5 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest shadow-sm">
-                            {viewingOrder.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border uppercase tracking-widest shadow-sm ${
+                              getEffectiveOrderStatus(viewingOrder) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                              'bg-blue-50 text-blue-600 border-blue-100'
+                            }`}>
+                              {getEffectiveOrderStatus(viewingOrder)}
+                            </span>
+                            {isStatusOverridden(viewingOrder.id) && (
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>
+                                <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">Updated</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right">
                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Acquisition Date</p>
@@ -867,7 +988,10 @@ const AdminDashboard: React.FC = () => {
                        <p className="text-4xl font-black italic">£{calculateOrderTotal(viewingOrder).toFixed(2)}</p>
                     </div>
                  </div>
-                 <button className="bg-pink-600 hover:bg-pink-500 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95">
+                 <button 
+                   onClick={() => setShowStatusModal(true)}
+                   className="bg-pink-600 hover:bg-pink-500 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95"
+                 >
                     Update Dispatch State
                  </button>
               </div>
@@ -875,6 +999,70 @@ const AdminDashboard: React.FC = () => {
             
             <div className="p-8 bg-gray-50 border-t flex justify-center">
                <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">BatLuxe Beauty Administrative Protocol Secure</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Update Modal */}
+      {showStatusModal && viewingOrder && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setShowStatusModal(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-white/20">
+            <div className="p-8 border-b flex justify-between items-center bg-gray-900 text-white">
+              <div>
+                <h2 className="text-xl font-black italic">Update Status</h2>
+                <p className="text-pink-300 text-[10px] font-black uppercase tracking-widest">Order #{viewingOrder.id.slice(-6)}</p>
+              </div>
+              <button onClick={() => setShowStatusModal(false)} className="text-white/50 hover:text-white transition-colors bg-white/10 p-2 rounded-xl">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="text-center">
+                <p className="text-sm font-bold text-gray-600 mb-2">Current Status</p>
+                <span className={`inline-block text-[10px] font-black px-4 py-2 rounded-full border uppercase tracking-widest ${
+                  getEffectiveOrderStatus(viewingOrder) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                  getEffectiveOrderStatus(viewingOrder) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                  getEffectiveOrderStatus(viewingOrder) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                  getEffectiveOrderStatus(viewingOrder) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
+                  getEffectiveOrderStatus(viewingOrder) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                  'bg-blue-50 text-blue-600 border-blue-100'
+                }`}>
+                  {getEffectiveOrderStatus(viewingOrder)}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-gray-600 mb-4">Select New Status</p>
+                <div className="space-y-3">
+                  {statusOptions.map((status) => (
+                    <button
+                      key={status.value}
+                      onClick={() => updateOrderStatus(viewingOrder.id, status.value)}
+                      disabled={updatingStatus || getEffectiveOrderStatus(viewingOrder) === status.value}
+                      className={`w-full p-4 rounded-xl border-2 font-black text-sm uppercase tracking-widest transition-all text-left flex items-center justify-between ${
+                        getEffectiveOrderStatus(viewingOrder) === status.value
+                          ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : `border-transparent ${status.color} hover:border-gray-300 hover:shadow-lg cursor-pointer`
+                      }`}
+                    >
+                      <span>{status.label}</span>
+                      {getEffectiveOrderStatus(viewingOrder) === status.value && (
+                        <CheckCircle2 size={16} className="text-gray-400" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {updatingStatus && (
+                <div className="flex items-center justify-center gap-3 py-4">
+                  <Loader2 className="w-5 h-5 text-pink-500 animate-spin" />
+                  <span className="text-sm font-bold text-gray-600">Updating status...</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { WebhookProvider } from './context/WebhookContext';
+import { preloadCriticalImages } from './utils/imagePreloader';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import AdminRoute from './components/AdminRoute';
@@ -28,6 +29,10 @@ import Contact from './pages/Contact';
 import { FAQs, Terms, PrivacyPolicy, ShippingPolicy } from './pages/StaticPages';
 
 const App: React.FC = () => {
+  // Initialize critical image preloading
+  useEffect(() => {
+    preloadCriticalImages();
+  }, []);
   return (
     <AuthProvider>
       <CartProvider>

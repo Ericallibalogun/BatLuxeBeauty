@@ -1,12 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Loader2, Check, Star } from 'lucide-react';
 import api from '../services/api';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { productCache } from '../services/productCache';
+import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
+import FastImage from '../components/FastImage';
 
 const ProductDetail: React.FC = () => {
+  usePerformanceMonitor('ProductDetail');
+  
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
@@ -21,27 +26,59 @@ const ProductDetail: React.FC = () => {
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!id) return;
+      if (!id) {
+        console.error('No product ID provided');
+        return;
+      }
+      
+      console.log('Fetching product with ID:', id);
       
       try {
         setLoading(true);
+        
+        // First check cache for the product
+        const cachedProducts = productCache.get();
+        if (cachedProducts) {
+          console.log('Checking cache for product:', id);
+          const foundProduct = cachedProducts.find((p: Product) => p.id === id);
+          if (foundProduct) {
+            console.log('Found product in cache:', foundProduct);
+            setProduct(foundProduct);
+            setLoading(false);
+            return;
+          }
+        }
+        
         // Try to fetch individual product first
         try {
+          console.log('Fetching individual product from API:', `/products/${id}`);
           const response = await api.get(`/products/${id}`);
-          setProduct(response.data);
+          console.log('Individual product response:', response.data);
+          const productData = response.data?.product || response.data;
+          setProduct(productData);
         } catch (error) {
           // If individual product endpoint doesn't exist, fetch all products and find the one we need
           console.log('Individual product endpoint not available, fetching from products list');
           const response = await api.get('/products');
           const rawData = response.data;
+          console.log('All products response:', rawData);
           const productsArray = Array.isArray(rawData) 
             ? rawData 
             : (rawData?.products || rawData?.data || []);
           
+          console.log('Products array:', productsArray);
+          console.log('Looking for product ID:', id);
+          
+          // Update cache with fresh data
+          productCache.set(productsArray);
+          
           const foundProduct = productsArray.find((p: Product) => p.id === id);
+          console.log('Found product:', foundProduct);
+          
           if (foundProduct) {
             setProduct(foundProduct);
           } else {
+            console.error('Product not found with ID:', id);
             throw new Error('Product not found');
           }
         }
@@ -57,7 +94,7 @@ const ProductDetail: React.FC = () => {
     fetchProduct();
   }, [id, navigate]);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = useCallback(async () => {
     if (!product) return;
     
     setAddingToCart(true);
@@ -68,9 +105,9 @@ const ProductDetail: React.FC = () => {
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 2000);
     }
-  };
+  }, [product, quantity, addToCart]);
 
-  const handleToggleWishlist = async () => {
+  const handleToggleWishlist = useCallback(async () => {
     if (!product) return;
     
     setWishlistLoading(true);
@@ -80,24 +117,48 @@ const ProductDetail: React.FC = () => {
       console.error('Error toggling wishlist:', error);
     }
     setTimeout(() => setWishlistLoading(false), 500);
-  };
+  }, [product, toggleWishlist]);
+
+  const totalPrice = useMemo(() => {
+    return product ? (product.price * quantity).toFixed(2) : '0.00';
+  }, [product, quantity]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FDF2F8]/20 py-20">
         <div className="container mx-auto px-4">
-          <div className="animate-pulse">
-            <div className="bg-white rounded-3xl p-8 shadow-xl">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                <div className="bg-gray-200 rounded-2xl h-96"></div>
+          {/* Loading skeleton */}
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-pink-50">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+              {/* Image skeleton */}
+              <div className="h-96 lg:h-auto bg-gray-200 animate-pulse"></div>
+              
+              {/* Content skeleton */}
+              <div className="p-8 lg:p-12 space-y-6">
                 <div className="space-y-4">
-                  <div className="bg-gray-200 h-8 rounded"></div>
-                  <div className="bg-gray-200 h-6 rounded w-3/4"></div>
-                  <div className="bg-gray-200 h-4 rounded w-1/2"></div>
-                  <div className="bg-gray-200 h-20 rounded"></div>
+                  <div className="bg-gray-200 h-12 rounded animate-pulse"></div>
+                  <div className="bg-gray-200 h-8 rounded w-3/4 animate-pulse"></div>
+                  <div className="bg-gray-200 h-6 rounded w-1/2 animate-pulse"></div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="bg-gray-200 h-4 rounded animate-pulse"></div>
+                  <div className="bg-gray-200 h-4 rounded animate-pulse"></div>
+                  <div className="bg-gray-200 h-4 rounded w-4/5 animate-pulse"></div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="bg-gray-200 h-12 rounded animate-pulse"></div>
+                  <div className="bg-gray-200 h-16 rounded animate-pulse"></div>
                 </div>
               </div>
             </div>
+          </div>
+          
+          {/* Loading indicator */}
+          <div className="text-center mt-8">
+            <Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto mb-4" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Loading Product Details</p>
           </div>
         </div>
       </div>
@@ -107,14 +168,30 @@ const ProductDetail: React.FC = () => {
   if (!product) {
     return (
       <div className="min-h-screen bg-[#FDF2F8]/20 py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-black text-gray-900 mb-4">Product Not Found</h1>
-          <button 
-            onClick={() => navigate('/shop')}
-            className="bg-pink-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-pink-600 transition-all"
-          >
-            Back to Shop
-          </button>
+        <div className="container mx-auto px-4">
+          <div className="text-center bg-white rounded-3xl p-12 shadow-xl border border-pink-50">
+            <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-8">
+              <ShoppingCart size={32} className="text-pink-200" />
+            </div>
+            <h1 className="text-4xl font-black text-gray-900 mb-4 italic">Product Not Found</h1>
+            <p className="text-gray-400 font-medium mb-8 max-w-md mx-auto">
+              The product you're looking for doesn't exist or may have been removed from our collection.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button 
+                onClick={() => navigate('/shop')}
+                className="bg-gray-900 hover:bg-pink-600 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-xl"
+              >
+                Browse Collection
+              </button>
+              <button 
+                onClick={() => navigate('/')}
+                className="bg-white hover:bg-gray-50 text-gray-900 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-xl border border-gray-200"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -155,10 +232,10 @@ const ProductDetail: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
             {/* Product Image */}
             <div className="relative h-96 lg:h-auto">
-              <img 
+              <FastImage 
                 src={product.image_url || 'https://picsum.photos/600/600'} 
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full"
               />
               <div className="absolute top-6 left-6">
                 <span className="bg-white/95 backdrop-blur-md text-pink-600 text-xs font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg">
@@ -229,7 +306,7 @@ const ProductDetail: React.FC = () => {
                       </button>
                     </div>
                     <span className="text-sm text-gray-500">
-                      Total: £{(product.price * quantity).toFixed(2)}
+                      Total: £{totalPrice}
                     </span>
                   </div>
                 </div>

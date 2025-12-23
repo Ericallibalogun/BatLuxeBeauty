@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import api from '../services/api';
 import { Product, Order, DashboardAnalytics, UserProfile } from '../types';
 import { 
@@ -9,8 +9,14 @@ import {
   User, Mail, Calendar, Hash, Info, FileText,
   Users, Shield
 } from 'lucide-react';
+import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
+import { useDebounce } from '../hooks/useDebounce';
+import FastImage from '../components/FastImage';
+import Pagination from '../components/Pagination';
 
 const AdminDashboard: React.FC = () => {
+  usePerformanceMonitor('AdminDashboard');
+  
   type Tab = 'overview' | 'products' | 'orders' | 'users';
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   
@@ -21,6 +27,22 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Pagination states
+  const [productsPage, setProductsPage] = useState(1);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // Search states
+  const [productSearch, setProductSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+
+  // Debounced search values
+  const debouncedProductSearch = useDebounce(productSearch, 300);
+  const debouncedOrderSearch = useDebounce(orderSearch, 300);
+  const debouncedUserSearch = useDebounce(userSearch, 300);
 
   // Order Details State
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -92,7 +114,63 @@ const AdminDashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Helper functions for localStorage status management
+  // Memoized filtered data
+  const filteredProducts = useMemo(() => {
+    if (!debouncedProductSearch.trim()) return products;
+    const searchLower = debouncedProductSearch.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(searchLower) || 
+      p.category?.toLowerCase().includes(searchLower)
+    );
+  }, [products, debouncedProductSearch]);
+
+  const filteredOrders = useMemo(() => {
+    if (!debouncedOrderSearch.trim()) return orders;
+    const searchLower = debouncedOrderSearch.toLowerCase();
+    return orders.filter(o => 
+      o.id.toLowerCase().includes(searchLower) ||
+      o.customer_name?.toLowerCase().includes(searchLower) ||
+      o.customer_email?.toLowerCase().includes(searchLower)
+    );
+  }, [orders, debouncedOrderSearch]);
+
+  const filteredUsers = useMemo(() => {
+    if (!debouncedUserSearch.trim()) return users;
+    const searchLower = debouncedUserSearch.toLowerCase();
+    return users.filter(u => 
+      u.name?.toLowerCase().includes(searchLower) ||
+      u.email?.toLowerCase().includes(searchLower)
+    );
+  }, [users, debouncedUserSearch]);
+
+  // Paginated data
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (productsPage - 1) * itemsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredProducts, productsPage, itemsPerPage]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (ordersPage - 1) * itemsPerPage;
+    return filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredOrders, ordersPage, itemsPerPage]);
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (usersPage - 1) * itemsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUsers, usersPage, itemsPerPage]);
+
+  // Reset pagination when search changes
+  useEffect(() => {
+    setProductsPage(1);
+  }, [debouncedProductSearch]);
+
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [debouncedOrderSearch]);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [debouncedUserSearch]);
   const getStoredStatusOverride = (orderId: string): string | null => {
     try {
       const overrides = localStorage.getItem('order_status_overrides');
@@ -569,14 +647,23 @@ const AdminDashboard: React.FC = () => {
             <div className="p-10 border-b flex flex-col sm:flex-row justify-between items-center bg-gray-50/20 gap-6 text-left">
               <div>
                 <h2 className="text-2xl font-black text-gray-900 italic">Catalog Management</h2>
-                <p className="text-gray-400 text-xs font-bold">{products.length} Products Active</p>
+                <p className="text-gray-400 text-xs font-bold">{filteredProducts.length} Products {filteredProducts.length !== products.length && `(${products.length} total)`}</p>
               </div>
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="bg-gray-900 hover:bg-pink-600 text-white px-8 py-4 rounded-xl flex items-center gap-3 font-black text-xs uppercase tracking-widest shadow-xl transition-all"
-              >
-                <Plus size={18} /> Add New Asset
-              </button>
+              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
+                />
+                <button 
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-gray-900 hover:bg-pink-600 text-white px-8 py-4 rounded-xl flex items-center gap-3 font-black text-xs uppercase tracking-widest shadow-xl transition-all"
+                >
+                  <Plus size={18} /> Add New Asset
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -590,11 +677,15 @@ const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
-                  {products.map((p) => (
+                  {paginatedProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-pink-50/10 transition-colors group">
                       <td className="px-10 py-6">
                         <div className="flex items-center gap-4">
-                          <img src={p.image_url || 'https://picsum.photos/200/200'} alt="" className="w-12 h-12 rounded-lg object-cover shadow-md" />
+                          <FastImage 
+                            src={p.image_url || 'https://picsum.photos/200/200'} 
+                            alt={p.name}
+                            className="w-12 h-12 rounded-lg object-cover shadow-md"
+                          />
                           <span className="font-black text-gray-900">{p.name}</span>
                         </div>
                       </td>
@@ -613,14 +704,34 @@ const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {Math.ceil(filteredProducts.length / itemsPerPage) > 1 && (
+              <div className="p-6 border-t">
+                <Pagination
+                  currentPage={productsPage}
+                  totalPages={Math.ceil(filteredProducts.length / itemsPerPage)}
+                  onPageChange={setProductsPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={filteredProducts.length}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'orders' && (
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-pink-50 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="p-10 border-b bg-gray-50/20 text-left">
-              <h2 className="text-2xl font-black text-gray-900 italic">Order Ledger</h2>
-              <p className="text-gray-400 text-xs font-bold">Recent Transactions</p>
+            <div className="p-10 border-b bg-gray-50/20 text-left flex flex-col sm:flex-row justify-between items-center gap-6">
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 italic">Order Ledger</h2>
+                <p className="text-gray-400 text-xs font-bold">{filteredOrders.length} Orders {filteredOrders.length !== orders.length && `(${orders.length} total)`}</p>
+              </div>
+              <input
+                type="text"
+                placeholder="Search orders..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
+              />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -634,9 +745,9 @@ const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
-                  {orders.map((o) => (
+                  {paginatedOrders.map((o) => (
                     <tr key={o.id} className="hover:bg-pink-50/10 transition-colors">
-                      <td className="px-10 py-6 font-black text-gray-900">#{o.id}</td>
+                      <td className="px-10 py-6 font-black text-gray-900">#{o.id.slice(-6)}</td>
                       <td className="px-10 py-6">
                         <div className="text-sm font-bold text-gray-800">{o.customer_name}</div>
                         <div className="text-[10px] text-gray-400">{o.customer_email}</div>
@@ -672,14 +783,34 @@ const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {Math.ceil(filteredOrders.length / itemsPerPage) > 1 && (
+              <div className="p-6 border-t">
+                <Pagination
+                  currentPage={ordersPage}
+                  totalPages={Math.ceil(filteredOrders.length / itemsPerPage)}
+                  onPageChange={setOrdersPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={filteredOrders.length}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'users' && (
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-pink-50 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="p-10 border-b bg-gray-50/20 text-left">
-              <h2 className="text-2xl font-black text-gray-900 italic">User Directory</h2>
-              <p className="text-gray-400 text-xs font-bold">{users.length} Authorized Patrons</p>
+            <div className="p-10 border-b bg-gray-50/20 text-left flex flex-col sm:flex-row justify-between items-center gap-6">
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 italic">User Directory</h2>
+                <p className="text-gray-400 text-xs font-bold">{filteredUsers.length} Authorized Patrons {filteredUsers.length !== users.length && `(${users.length} total)`}</p>
+              </div>
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
+              />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -692,7 +823,7 @@ const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
-                  {users.length > 0 ? users.map((u) => (
+                  {paginatedUsers.length > 0 ? paginatedUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-pink-50/10 transition-colors">
                       <td className="px-10 py-6">
                         <div className="flex items-center gap-4">
@@ -729,13 +860,24 @@ const AdminDashboard: React.FC = () => {
                   )) : (
                     <tr>
                       <td colSpan={4} className="px-10 py-20 text-center text-gray-300 italic font-bold">
-                        User directory synchronization pending or insufficient permissions.
+                        {userSearch ? 'No users found matching your search.' : 'User directory synchronization pending or insufficient permissions.'}
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            {Math.ceil(filteredUsers.length / itemsPerPage) > 1 && (
+              <div className="p-6 border-t">
+                <Pagination
+                  currentPage={usersPage}
+                  totalPages={Math.ceil(filteredUsers.length / itemsPerPage)}
+                  onPageChange={setUsersPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={filteredUsers.length}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

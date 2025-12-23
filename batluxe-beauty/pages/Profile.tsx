@@ -7,8 +7,8 @@ import { Order, Product } from '../types';
 import { 
   ShoppingBag, Calendar, Package, ArrowRight, 
   Loader2, CheckCircle2, X, Info, FileText, 
-  User, Mail, ShieldCheck, Hash, Clock, Settings,
-  Edit, Phone, MapPin, Save
+  User, Mail, ShieldCheck, Hash, Clock,
+  Phone, MapPin
 } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -16,8 +16,7 @@ const Profile: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Profile editing state
-  const [isEditingShipping, setIsEditingShipping] = useState(false);
+  // Profile data state
   const [profileData, setProfileData] = useState({
     fullName: '',
     email: user?.email || '',
@@ -98,34 +97,35 @@ const Profile: React.FC = () => {
         
         setOrders(ordersArray);
 
-        // Fetch user profile data and shipping address
-        try {
-          const profileResponse = await api.get('/users/me');
-          const profile = profileResponse.data.user; // API returns { user: {...} }
-          
-          // Update profile data with fetched API data
-          setProfileData({
-            fullName: profile.name || profile.full_name || '',
-            email: user?.email || profile.email || '', // Email from token is most reliable
-            phone: profile.phone_number || profile.phone || '',
-            accountType: user?.role || profile.role || 'User',
-            memberSince: profile.created_at || new Date().toISOString()
-          });
-          
-          // Fetch shipping address from profile
-          if (profile.shipping_address) {
-            setShippingAddress(profile.shipping_address);
+        // Use user data from JWT token instead of fetching from API
+        // since /users/me endpoint doesn't exist
+        setProfileData({
+          fullName: user?.email?.split('@')[0] || 'User', // Use email prefix as name
+          email: user?.email || '',
+          phone: '', // Will be populated from order data if available
+          accountType: user?.role || 'User',
+          memberSince: new Date().toISOString() // Default to current date
+        });
+
+        // Try to get user info from the first order if available
+        if (ordersArray.length > 0) {
+          const firstOrder = ordersArray[0];
+          if (firstOrder.customer_name) {
+            setProfileData(prev => ({
+              ...prev,
+              fullName: firstOrder.customer_name
+            }));
           }
-        } catch (profileErr) {
-          console.error("Failed to fetch profile data:", profileErr);
-          // If profile fetch fails, we still have email from token
-          setProfileData({
-            fullName: '',
-            email: user?.email || '',
-            phone: '',
-            accountType: user?.role || 'User',
-            memberSince: new Date().toISOString()
-          });
+          if (firstOrder.customer_phone) {
+            setProfileData(prev => ({
+              ...prev,
+              phone: firstOrder.customer_phone
+            }));
+          }
+          // Set shipping address from the most recent order
+          if (firstOrder.shipping_address) {
+            setShippingAddress(firstOrder.shipping_address);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch data", err);
@@ -136,17 +136,6 @@ const Profile: React.FC = () => {
 
     if (user) fetchData();
   }, [user]);
-
-
-
-  const saveShippingAddress = async () => {
-    try {
-      await api.put('/profile/shipping', { shipping_address: shippingAddress });
-      setIsEditingShipping(false);
-    } catch (err) {
-      console.error("Failed to update shipping address", err);
-    }
-  };
 
   const viewOrderDetails = async (order: Order) => {
     setSelectedOrder(order);
@@ -315,102 +304,33 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
-          {/* Shipping Address Card */}
+          {/* Shipping Address Card - Display Only */}
           <div className="bg-gray-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden group">
             <div className="absolute bottom-0 right-0 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl -mb-20 -mr-20 group-hover:bg-pink-500/30 transition-all"></div>
             
             <div className="relative z-10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-12">
+              <div className="mb-12">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-black italic mb-3 flex items-center gap-3">
                     <MapPin className="text-pink-500 flex-shrink-0" size={28} /> Delivery Coordinates
                   </h2>
-                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Fulfillment Address</p>
+                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">From Latest Order</p>
                 </div>
-                <button
-                  onClick={() => setIsEditingShipping(!isEditingShipping)}
-                  className="bg-white/10 hover:bg-pink-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 flex-shrink-0 self-start sm:self-auto"
-                >
-                  <Edit size={16} />
-                  {isEditingShipping ? 'Cancel' : 'Configure'}
-                </button>
               </div>
 
-              <div className="space-y-8">
-                {isEditingShipping ? (
-                  <>
-                    <div className="space-y-6">
-                      <div>
-                        <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Street Address</label>
-                        <input
-                          type="text"
-                          value={shippingAddress.street}
-                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
-                          className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
-                          placeholder="Enter your street address"
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">City</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.city}
-                            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                            className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
-                            placeholder="Enter your city"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Postal Code</label>
-                          <input
-                            type="text"
-                            value={shippingAddress.postalCode}
-                            onChange={(e) => setShippingAddress({...shippingAddress, postalCode: e.target.value})}
-                            className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold placeholder:text-white/50"
-                            placeholder="Postal code"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-3 block">Country</label>
-                        <select
-                          value={shippingAddress.country}
-                          onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
-                          className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-2xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-white font-bold"
-                        >
-                          <option value="United Kingdom">United Kingdom</option>
-                          <option value="Ireland">Ireland</option>
-                          <option value="France">France</option>
-                          <option value="Germany">Germany</option>
-                          <option value="Spain">Spain</option>
-                        </select>
-                      </div>
+              <div>
+                {shippingAddress.street ? (
+                  <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
+                    <div className="text-white font-bold text-lg leading-relaxed">
+                      <p className="mb-2">{shippingAddress.street}</p>
+                      <p className="mb-2">{shippingAddress.city} {shippingAddress.postalCode}</p>
+                      <p className="text-pink-300 font-black uppercase text-sm tracking-widest">{shippingAddress.country}</p>
                     </div>
-                    <button
-                      onClick={saveShippingAddress}
-                      className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all flex items-center gap-3"
-                    >
-                      <Save size={18} />
-                      Secure Address
-                    </button>
-                  </>
+                  </div>
                 ) : (
-                  <div>
-                    {shippingAddress.street ? (
-                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10">
-                        <div className="text-white font-bold text-lg leading-relaxed">
-                          <p className="mb-2">{shippingAddress.street}</p>
-                          <p className="mb-2">{shippingAddress.city} {shippingAddress.postalCode}</p>
-                          <p className="text-pink-300 font-black uppercase text-sm tracking-widest">{shippingAddress.country}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center">
-                        <p className="text-white/60 italic font-medium mb-4">No delivery coordinates configured</p>
-                        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Configure address for seamless fulfillment</p>
-                      </div>
-                    )}
+                  <div className="bg-white/5 p-8 rounded-3xl border border-white/10 text-center">
+                    <p className="text-white/60 italic font-medium mb-4">No delivery coordinates found</p>
+                    <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Address will appear after first order</p>
                   </div>
                 )}
               </div>

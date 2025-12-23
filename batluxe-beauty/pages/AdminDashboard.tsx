@@ -72,14 +72,10 @@ const AdminDashboard: React.FC = () => {
       try {
         const analyticsRes = await api.get('/admin/analytics');
         const aData = analyticsRes.data?.analytics || analyticsRes.data;
-        setAnalytics(aData);
+        // We'll use calculated analytics instead of backend analytics
+        console.log('Backend analytics (if available):', aData);
       } catch (e) {
-        setAnalytics({
-          total_revenue: 0,
-          daily_sales: 0,
-          top_products: [],
-          sales_trend: []
-        });
+        console.log('Backend analytics not available, using calculated analytics from orders');
       }
     } catch (err) {
       console.error("Dashboard fetch error:", err);
@@ -92,6 +88,84 @@ const AdminDashboard: React.FC = () => {
     fetchData();
   }, []);
 
+  // Helper function to calculate order total from API data
+  const calculateOrderTotal = (order: any) => {
+    // Priority 1: Use total_price from backend (most reliable)
+    if (order.total_price && order.total_price > 0) {
+      return order.total_price;
+    }
+    
+    // Priority 2: Use total_amount from backend
+    if (order.total_amount && order.total_amount > 0) {
+      return order.total_amount;
+    }
+    
+    // Priority 3: Calculate from subtotal + shipping
+    if (order.subtotal && order.subtotal > 0) {
+      const shipping = order.shipping_fee || 0;
+      return order.subtotal + shipping;
+    }
+    
+    // Priority 4: Calculate from items if available
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      const itemsTotal = order.items.reduce((sum: number, item: any) => {
+        const price = item.price || 0;
+        const quantity = item.quantity || 1;
+        return sum + (price * quantity);
+      }, 0);
+      const shipping = order.shipping_fee || 0;
+      return itemsTotal + shipping;
+    }
+    
+    return 0;
+  };
+
+  // Calculate total revenue from all orders
+  const calculateTotalRevenue = () => {
+    return orders.reduce((total, order) => total + calculateOrderTotal(order), 0);
+  };
+
+  // Calculate daily sales (orders from today)
+  const calculateDailySales = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return orders
+      .filter(order => {
+        const orderDate = new Date(order.created_at);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate.getTime() === today.getTime();
+      })
+      .reduce((total, order) => total + calculateOrderTotal(order), 0);
+  };
+
+  // Get top products based on order frequency
+  const getTopProducts = () => {
+    const productSales: { [key: string]: { name: string; sales: number } } = {};
+    
+    // Count sales from orders
+    orders.forEach(order => {
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const productName = item.product_name || item.name || 'Unknown Product';
+          if (productSales[productName]) {
+            productSales[productName].sales += item.quantity || 1;
+          } else {
+            productSales[productName] = {
+              name: productName,
+              sales: item.quantity || 1
+            };
+          }
+        });
+      }
+    });
+    
+    // Convert to array and sort by sales
+    return Object.values(productSales)
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5); // Top 5 products
+  };
+
   const handleViewOrderDetails = async (order: Order) => {
     setViewingOrder(order);
     setOrderItems([]);
@@ -99,10 +173,37 @@ const AdminDashboard: React.FC = () => {
     try {
       const response = await api.get(`/orders/${order.id}`);
       const data = response.data;
-      const items = data.items || data.order_items || data.OrderItems || [];
+      console.log('Admin order details response:', data);
+      
+      // Backend returns { order: {...} } or direct order data
+      const orderData = data.order || data;
+      
+      // Get items from the order data
+      let items = orderData.items || orderData.order_items || [];
+      console.log('Admin order items:', items);
+      
+      // Ensure items have proper structure
+      if (items && items.length > 0) {
+        items = items.map((item: any) => ({
+          ...item,
+          product_name: item.product_name || item.name || 'Product',
+          price: item.price || 0,
+          quantity: item.quantity || 1
+        }));
+      }
+      
       setOrderItems(Array.isArray(items) ? items : []);
+      
+      // Update viewing order with complete data
+      setViewingOrder({
+        ...order,
+        ...orderData,
+        items: items
+      });
+      
     } catch (err) {
       console.error("Failed to fetch order details", err);
+      setOrderItems([]);
     } finally {
       setLoadingOrderDetails(false);
     }
@@ -187,8 +288,6 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  const maxSales = analytics?.top_products?.reduce((max, p) => p.sales > max ? p.sales : max, 0) || 1;
-
   return (
     <div className="min-h-screen bg-[#FDF2F8]/20 py-12 text-gray-900">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -225,7 +324,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Revenue</p>
-                  <p className="text-2xl font-black text-gray-900">£{analytics?.total_revenue?.toLocaleString() || '0.00'}</p>
+                  <p className="text-2xl font-black text-gray-900">£{calculateTotalRevenue().toLocaleString()}</p>
                 </div>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-pink-50 flex items-center gap-6 group hover:-translate-y-1 transition-all">
@@ -234,7 +333,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Daily Velocity</p>
-                  <p className="text-2xl font-black text-gray-900">£{analytics?.daily_sales?.toLocaleString() || '0.00'}</p>
+                  <p className="text-2xl font-black text-gray-900">£{calculateDailySales().toLocaleString()}</p>
                 </div>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-pink-50 flex items-center gap-6 group hover:-translate-y-1 transition-all">
@@ -257,60 +356,117 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] shadow-2xl border border-pink-50 p-12">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-4 text-left">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Award size={20} className="text-pink-500" />
-                    <h2 className="text-2xl font-black text-gray-900 italic">Product Performance</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              {/* Product Performance */}
+              <div className="bg-white rounded-[2.5rem] shadow-2xl border border-pink-50 p-12">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-4 text-left">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award size={20} className="text-pink-500" />
+                      <h2 className="text-2xl font-black text-gray-900 italic">Product Performance</h2>
+                    </div>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Master Analysis: Most Sold Acquisitions</p>
                   </div>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Master Analysis: Most Sold Acquisitions</p>
+                  <div className="bg-gray-50 px-6 py-3 rounded-full border border-pink-50 text-[10px] font-black text-pink-500 uppercase tracking-widest">
+                    Live Market Feed
+                  </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 rounded-full border border-pink-50 text-[10px] font-black text-pink-500 uppercase tracking-widest">
-                  Live Market Feed
+
+                <div className="relative pt-10 text-left">
+                  <div className="space-y-12">
+                    {getTopProducts().length > 0 ? (
+                      getTopProducts().map((product, idx) => (
+                        <div key={idx} className="group">
+                          <div className="flex justify-between items-end mb-4">
+                            <div className="flex items-center gap-4">
+                              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black italic shadow-lg">
+                                {idx + 1}
+                              </span>
+                              <span className="font-black text-gray-900 italic text-lg">{product.name}</span>
+                            </div>
+                            <span className="text-pink-500 font-black text-lg italic tracking-tight">{product.sales} Sales</span>
+                          </div>
+                          <div className="h-4 bg-gray-50 rounded-full overflow-hidden shadow-inner border border-gray-100 p-0.5">
+                            <div 
+                              className="h-full rounded-full bg-gradient-to-r from-pink-400 to-purple-600 shadow-lg shadow-pink-200 transition-all duration-1000 ease-out flex items-center justify-end px-4 relative group-hover:brightness-110"
+                              style={{ width: `${(product.sales / Math.max(...getTopProducts().map(p => p.sales), 1)) * 100}%` }}
+                            >
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-center py-10 text-gray-300 font-bold italic">Awaiting Market Performance Data...</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-20 pt-10 border-t border-pink-50 flex flex-col md:flex-row justify-between items-center gap-6">
+                  <div className="flex items-center gap-3">
+                     <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Database Synced via JWT Secure Link</span>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('products')}
+                    className="flex items-center gap-3 text-pink-600 font-black uppercase tracking-widest text-[10px] hover:translate-x-2 transition-transform"
+                  >
+                    Manage Full Inventory <ArrowRight size={14} />
+                  </button>
                 </div>
               </div>
 
-              <div className="relative pt-10 text-left">
-                <div className="space-y-12">
-                  {analytics?.top_products && analytics.top_products.length > 0 ? (
-                    analytics.top_products.map((product, idx) => (
-                      <div key={idx} className="group">
-                        <div className="flex justify-between items-end mb-4">
-                          <div className="flex items-center gap-4">
-                            <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-black italic shadow-lg">
-                              {idx + 1}
-                            </span>
-                            <span className="font-black text-gray-900 italic text-lg">{product.name}</span>
+              {/* Recent Orders */}
+              <div className="bg-white rounded-[2.5rem] shadow-2xl border border-pink-50 p-12">
+                <div className="flex items-center justify-between mb-12">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Hash size={20} className="text-pink-500" />
+                      <h2 className="text-2xl font-black text-gray-900 italic">Recent Orders</h2>
+                    </div>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Latest Transactions</p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('orders')}
+                    className="flex items-center gap-3 text-pink-600 font-black uppercase tracking-widest text-[10px] hover:translate-x-2 transition-transform"
+                  >
+                    View All <ArrowRight size={14} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {orders.length === 0 ? (
+                    <div className="text-center py-20">
+                      <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-8">
+                        <ShoppingBag size={32} className="text-pink-200" />
+                      </div>
+                      <p className="text-gray-400 font-bold mb-8 italic">No transactions found in ledger.</p>
+                    </div>
+                  ) : (
+                    orders.slice(0, 5).map((order: any) => (
+                      <div 
+                        key={order.id} 
+                        onClick={() => handleViewOrderDetails(order)}
+                        className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl hover:bg-pink-50 hover:shadow-xl transition-all group border border-pink-50 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-900 border border-pink-100 shadow-inner group-hover:bg-pink-500 group-hover:text-white transition-all">
+                            <Hash size={16} />
                           </div>
-                          <span className="text-pink-500 font-black text-lg italic tracking-tight">{product.sales} Sales</span>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order #{order.id.slice(-6)}</p>
+                            <p className="text-sm font-black text-gray-900">{order.customer_name}</p>
+                          </div>
                         </div>
-                        <div className="h-4 bg-gray-50 rounded-full overflow-hidden shadow-inner border border-gray-100 p-0.5">
-                          <div 
-                            className="h-full rounded-full bg-gradient-to-r from-pink-400 to-purple-600 shadow-lg shadow-pink-200 transition-all duration-1000 ease-out flex items-center justify-end px-4 relative group-hover:brightness-110"
-                            style={{ width: `${(product.sales / maxSales) * 100}%` }}
-                          >
-                          </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-gray-900">£{calculateOrderTotal(order).toFixed(2)}</p>
+                          <span className="text-[8px] font-black px-3 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">
+                            {order.status}
+                          </span>
                         </div>
                       </div>
                     ))
-                  ) : (
-                    <p className="text-center py-10 text-gray-300 font-bold italic">Awaiting Market Performance Data...</p>
                   )}
                 </div>
-              </div>
-
-              <div className="mt-20 pt-10 border-t border-pink-50 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div className="flex items-center gap-3">
-                   <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Database Synced via JWT Secure Link</span>
-                </div>
-                <button 
-                  onClick={() => setActiveTab('products')}
-                  className="flex items-center gap-3 text-pink-600 font-black uppercase tracking-widest text-[10px] hover:translate-x-2 transition-transform"
-                >
-                  Manage Full Inventory <ArrowRight size={14} />
-                </button>
               </div>
             </div>
           </div>
@@ -396,7 +552,7 @@ const AdminDashboard: React.FC = () => {
                       <td className="px-10 py-6">
                         <span className="text-[10px] font-black px-3 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-widest">{o.status}</span>
                       </td>
-                      <td className="px-10 py-6 font-black text-gray-900">£{(o.total_amount || 0).toFixed(2)}</td>
+                      <td className="px-10 py-6 font-black text-gray-900">£{calculateOrderTotal(o).toFixed(2)}</td>
                       <td className="px-10 py-6 text-right">
                         <button 
                           onClick={() => handleViewOrderDetails(o)}
@@ -661,9 +817,35 @@ const AdminDashboard: React.FC = () => {
                             <tr key={idx} className="hover:bg-pink-50/10 transition-colors">
                               <td className="px-8 py-5 font-bold text-gray-900 italic">{item.product_name || item.name || 'Bespoke Asset'}</td>
                               <td className="px-8 py-5 text-center font-black text-gray-400">{item.quantity}</td>
-                              <td className="px-8 py-5 text-right font-black text-gray-900">£{(item.price || 0).toFixed(2)}</td>
+                              <td className="px-8 py-5 text-right font-black text-gray-900">£{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</td>
                             </tr>
                           ))}
+                          {orderItems.length > 0 && (
+                            <>
+                              <tr className="border-t-2 border-pink-100">
+                                <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Subtotal</td>
+                                <td className="px-8 py-4 text-right font-black text-gray-900">
+                                  £{orderItems.reduce((sum, item) => {
+                                    const price = item.price || 0;
+                                    const quantity = item.quantity || 1;
+                                    return sum + (price * quantity);
+                                  }, 0).toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Shipping</td>
+                                <td className="px-8 py-4 text-right font-black text-gray-900">
+                                  £{(viewingOrder?.shipping_fee || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr className="border-t-2 border-pink-200 bg-pink-50">
+                                <td className="px-8 py-5 font-black text-gray-900 uppercase text-xs tracking-widest" colSpan={2}>Total</td>
+                                <td className="px-8 py-5 text-right font-black text-pink-600 text-lg">
+                                  £{calculateOrderTotal(viewingOrder).toFixed(2)}
+                                </td>
+                              </tr>
+                            </>
+                          )}
                         </tbody>
                       </table>
                     ) : (
@@ -682,7 +864,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="text-left">
                        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">Total Transaction Volume</p>
-                       <p className="text-4xl font-black italic">£{(viewingOrder.total_amount || 0).toFixed(2)}</p>
+                       <p className="text-4xl font-black italic">£{calculateOrderTotal(viewingOrder).toFixed(2)}</p>
                     </div>
                  </div>
                  <button className="bg-pink-600 hover:bg-pink-500 text-white px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95">

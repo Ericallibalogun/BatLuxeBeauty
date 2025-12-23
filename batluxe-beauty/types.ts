@@ -39,9 +39,23 @@ export interface Order {
   customer_name: string;
   customer_email: string;
   total_amount: number;
+  total_price?: number; // Backend might use this field
+  subtotal?: number;
+  shipping_fee?: number;
   status: 'Pending' | 'Shipped' | 'Delivered' | 'Cancelled';
   created_at: string;
+  updated_at?: string;
   items_count: number;
+  items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id?: string;
+  product_id: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  product?: Product;
 }
 
 export interface SalesData {

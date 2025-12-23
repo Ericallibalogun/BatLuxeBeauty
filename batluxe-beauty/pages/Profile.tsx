@@ -38,94 +38,41 @@ const Profile: React.FC = () => {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showAllOrders, setShowAllOrders] = useState(false);
 
-  // Helper function to get stored shipping fee for an order
-  const getStoredShippingFee = (orderId: string) => {
-    try {
-      const existingData = localStorage.getItem('order_shipping_fees');
-      if (existingData) {
-        const shippingFees = JSON.parse(existingData);
-        const storedFee = shippingFees[orderId]?.shippingFee;
-        if (storedFee && storedFee > 0) {
-          return storedFee;
-        }
-      }
-    } catch (error) {
-      console.error('Error reading stored shipping fees:', error);
-    }
-    // Return 0 for orders without stored shipping data (old orders)
-    return 0;
-  };
-
-  // Helper function to calculate order total from items
-  const calculateOrderTotal = (order: any, items: any[] = []) => {
-    console.log('calculateOrderTotal called with:', { 
-      order: order, 
-      items: items,
-      total_price: order?.total_price,
-      subtotal: order?.subtotal,
-      shipping_fee: order?.shipping_fee
-    });
+  // Helper function to calculate order total from API data
+  const calculateOrderTotal = (order: any) => {
+    console.log('calculateOrderTotal called with:', order);
     
-    // Backend uses 'total_price' but may or may not include shipping
+    // Priority 1: Use total_price from backend (most reliable)
     if (order.total_price && order.total_price > 0) {
-      // Check if backend already included shipping (shipping_fee > 0)
-      if (order.shipping_fee && order.shipping_fee > 0) {
-        console.log('Using total_price (already includes shipping):', order.total_price);
-        return order.total_price;
-      }
-      
-      // Backend didn't include shipping, add stored shipping fee
-      const storedShipping = getStoredShippingFee(order.id);
-      const totalWithShipping = order.total_price + storedShipping;
-      console.log('Using total_price + stored shipping:', { 
-        total_price: order.total_price, 
-        shipping: storedShipping, 
-        total: totalWithShipping 
-      });
-      return totalWithShipping;
+      console.log('Using backend total_price:', order.total_price);
+      return order.total_price;
     }
     
-    // Check if we have subtotal (backend calculated)
+    // Priority 2: Use total_amount from backend
+    if (order.total_amount && order.total_amount > 0) {
+      console.log('Using backend total_amount:', order.total_amount);
+      return order.total_amount;
+    }
+    
+    // Priority 3: Calculate from subtotal + shipping
     if (order.subtotal && order.subtotal > 0) {
-      // Add backend shipping fee if it exists, otherwise add stored shipping
-      const backendShipping = order.shipping_fee || 0;
-      const storedShipping = backendShipping > 0 ? 0 : getStoredShippingFee(order.id);
-      const totalShipping = backendShipping + storedShipping;
-      const backendTotal = order.subtotal + totalShipping;
-      console.log('Using subtotal + shipping:', { 
-        subtotal: order.subtotal, 
-        backendShipping,
-        storedShipping,
-        totalShipping,
-        total: backendTotal 
-      });
-      return backendTotal;
+      const shipping = order.shipping_fee || 0;
+      const total = order.subtotal + shipping;
+      console.log('Calculated from subtotal + shipping:', { subtotal: order.subtotal, shipping, total });
+      return total;
     }
     
-    // Calculate from items if available
-    if (items && items.length > 0) {
-      const itemsTotal = items.reduce((sum, item) => {
-        const price = item.price || item.product?.price || 0;
-        const quantity = item.quantity || 1;
-        return sum + (price * quantity);
-      }, 0);
-      const storedShipping = getStoredShippingFee(order.id);
-      const calculatedTotal = itemsTotal + storedShipping;
-      console.log('Calculated from items + shipping:', { itemsTotal, shipping: storedShipping, calculatedTotal });
-      return calculatedTotal;
-    }
-    
-    // If no items but we have order data, try to extract from order
+    // Priority 4: Calculate from items if available
     if (order.items && Array.isArray(order.items) && order.items.length > 0) {
       const itemsTotal = order.items.reduce((sum: number, item: any) => {
         const price = item.price || 0;
         const quantity = item.quantity || 1;
         return sum + (price * quantity);
       }, 0);
-      const storedShipping = getStoredShippingFee(order.id);
-      const calculatedTotal = itemsTotal + storedShipping;
-      console.log('Calculated from order.items + shipping:', { itemsTotal, shipping: storedShipping, calculatedTotal });
-      return calculatedTotal;
+      const shipping = order.shipping_fee || 0;
+      const total = itemsTotal + shipping;
+      console.log('Calculated from items + shipping:', { itemsTotal, shipping, total });
+      return total;
     }
     
     console.log('No valid total found, returning 0');
@@ -135,21 +82,18 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch orders
+        // Fetch orders using the proper Get_All_orders endpoint
         const ordersResponse = await api.get('/orders');
         const ordersData = ordersResponse.data;
         console.log('Raw orders response:', ordersData);
         
-        // Backend returns { orders: [...] }
+        // Backend returns { orders: [...] } according to API docs
         const ordersArray = ordersData?.orders || (Array.isArray(ordersData) ? ordersData : []);
         console.log('Parsed orders array:', ordersArray);
         
         // Log first order to see structure
         if (ordersArray.length > 0) {
           console.log('First order structure:', ordersArray[0]);
-          console.log('First order total_price:', ordersArray[0].total_price);
-          console.log('First order subtotal:', ordersArray[0].subtotal);
-          console.log('First order shipping_fee:', ordersArray[0].shipping_fee);
         }
         
         setOrders(ordersArray);
@@ -213,42 +157,65 @@ const Profile: React.FC = () => {
       const data = response.data;
       console.log('Order details response:', data);
       
-      // Backend returns { order: {...} }
+      // Backend returns { order: {...} } or direct order data
       const orderData = data.order || data;
       console.log('Order data:', orderData);
       
-      let items = orderData.items || [];
-      console.log('Order items:', items);
+      // Get items from the order data
+      let items = orderData.items || orderData.order_items || [];
+      console.log('Raw order items:', items);
       
-      // Items from backend already have product_name and price
-      // But we can still hydrate with full product info if needed
-      if (items.length > 0) {
-        const productsRes = await api.get('/products');
-        const products = Array.isArray(productsRes.data) 
-          ? productsRes.data 
-          : (productsRes.data?.products || productsRes.data?.data || []);
-        
-        // Enhance items with full product information
-        items = items.map((item: any) => {
-          const productId = item.product_id;
-          const productInfo = products.find((p: any) => p.id === productId);
+      // If items exist, enhance them with product information
+      if (items && items.length > 0) {
+        try {
+          const productsRes = await api.get('/products');
+          const products = Array.isArray(productsRes.data) 
+            ? productsRes.data 
+            : (productsRes.data?.products || productsRes.data?.data || []);
           
-          return {
+          // Enhance items with full product information
+          items = items.map((item: any) => {
+            const productId = item.product_id;
+            const productInfo = products.find((p: any) => p.id === productId);
+            
+            return {
+              ...item,
+              product_name: item.product_name || productInfo?.name || 'Product',
+              price: item.price || productInfo?.price || 0,
+              quantity: item.quantity || 1,
+              product: productInfo || {
+                id: productId,
+                name: item.product_name || 'Product',
+                price: item.price || 0,
+                image_url: 'https://picsum.photos/200/200'
+              }
+            };
+          });
+        } catch (productErr) {
+          console.error('Error fetching products for enhancement:', productErr);
+          // Use items as-is if product fetch fails
+          items = items.map((item: any) => ({
             ...item,
-            product: productInfo || {
-              id: productId,
-              name: item.product_name || 'Product',
-              price: item.price || 0,
-              image_url: 'https://picsum.photos/200/200'
-            }
-          };
-        });
+            product_name: item.product_name || 'Product',
+            price: item.price || 0,
+            quantity: item.quantity || 1
+          }));
+        }
       }
       
       console.log('Enhanced items:', items);
       setOrderItems(Array.isArray(items) ? items : []);
+      
+      // Update selected order with complete data from backend
+      setSelectedOrder({
+        ...order,
+        ...orderData,
+        items: items
+      });
+      
     } catch (err) {
       console.error("Error fetching detailed order info", err);
+      setOrderItems([]);
     } finally {
       setLoadingDetails(false);
     }
@@ -584,7 +551,7 @@ const Profile: React.FC = () => {
                  </div>
                  <div className="bg-gray-50 p-6 rounded-3xl border border-pink-50 text-left">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Total Investment</p>
-                    <p className="text-2xl font-black text-gray-900">£{calculateOrderTotal(selectedOrder, orderItems).toFixed(2)}</p>
+                    <p className="text-2xl font-black text-gray-900">£{calculateOrderTotal(selectedOrder).toFixed(2)}</p>
                  </div>
               </div>
 
@@ -613,11 +580,11 @@ const Profile: React.FC = () => {
                           {orderItems.map((item, idx) => (
                             <tr key={idx}>
                               <td className="px-8 py-5 font-bold text-gray-900 italic">
-                                {item.product?.name || item.product_name || item.name || 'Luxury Product'}
+                                {item.product_name || item.product?.name || item.name || 'Luxury Product'}
                               </td>
                               <td className="px-8 py-5 text-center font-black text-gray-400">{item.quantity || 1}</td>
                               <td className="px-8 py-5 text-right font-black text-gray-900">
-                                £{((item.product?.price || item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                                £{((item.price || item.product?.price || 0) * (item.quantity || 1)).toFixed(2)}
                               </td>
                             </tr>
                           ))}
@@ -627,7 +594,7 @@ const Profile: React.FC = () => {
                                 <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Subtotal</td>
                                 <td className="px-8 py-4 text-right font-black text-gray-900">
                                   £{orderItems.reduce((sum, item) => {
-                                    const price = item.product?.price || item.price || 0;
+                                    const price = item.price || item.product?.price || 0;
                                     const quantity = item.quantity || 1;
                                     return sum + (price * quantity);
                                   }, 0).toFixed(2)}
@@ -636,13 +603,13 @@ const Profile: React.FC = () => {
                               <tr>
                                 <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Shipping</td>
                                 <td className="px-8 py-4 text-right font-black text-gray-900">
-                                  £{(selectedOrder.shipping_fee > 0 ? selectedOrder.shipping_fee : getStoredShippingFee(selectedOrder.id)).toFixed(2)}
+                                  £{(selectedOrder?.shipping_fee || 0).toFixed(2)}
                                 </td>
                               </tr>
                               <tr className="border-t-2 border-pink-200 bg-pink-50">
                                 <td className="px-8 py-5 font-black text-gray-900 uppercase text-xs tracking-widest" colSpan={2}>Total</td>
                                 <td className="px-8 py-5 text-right font-black text-pink-600 text-lg">
-                                  £{calculateOrderTotal(selectedOrder, orderItems).toFixed(2)}
+                                  £{calculateOrderTotal(selectedOrder).toFixed(2)}
                                 </td>
                               </tr>
                             </>

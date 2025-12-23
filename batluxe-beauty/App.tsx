@@ -53,19 +53,14 @@ const App: React.FC = () => {
                   <Route path="/access-denied" element={<AccessDenied />} />
 
                   {/* Protected User Routes */}
-                  <Route element={<UserRoute />}>
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/account-settings" element={<AccountSettings />} />
-                    <Route path="/wishlist" element={<Wishlist />} />
-                  </Route>
+                  <Route path="/profile" element={<UserRoute><Profile /></UserRoute>} />
+                  <Route path="/account-settings" element={<UserRoute><AccountSettings /></UserRoute>} />
+                  <Route path="/wishlist" element={<UserRoute><Wishlist /></UserRoute>} />
 
                   {/* Protected Admin Routes */}
-                  <Route path="/admin" element={<AdminRoute />}>
-                    <Route path="dashboard" element={<AdminDashboard />} />
-                    <Route path="users" element={<AdminDashboard />} />
-                    <Route path="products" element={<AdminDashboard />} />
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                  </Route>
+                  <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                  <Route path="/admin/users" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                  <Route path="/admin/products" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
                   {/* Catch all */}
                   <Route path="*" element={<Navigate to="/" replace />} />

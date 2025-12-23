@@ -1,10 +1,14 @@
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
-const AdminRoute: React.FC = () => {
+interface AdminRouteProps {
+  children?: ReactNode;
+}
+
+const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -32,7 +36,7 @@ const AdminRoute: React.FC = () => {
     return <Navigate to="/access-denied" replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default AdminRoute;

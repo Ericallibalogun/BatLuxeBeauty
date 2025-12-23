@@ -52,8 +52,8 @@ const Profile: React.FC = () => {
     } catch (error) {
       console.error('Error reading stored shipping fees:', error);
     }
-    // Default to standard shipping if not found
-    return 2.99;
+    // Return 0 for orders without stored shipping data (old orders)
+    return 0;
   };
 
   // Helper function to calculate order total from items
@@ -66,8 +66,15 @@ const Profile: React.FC = () => {
       shipping_fee: order?.shipping_fee
     });
     
-    // Backend uses 'total_price' but doesn't include shipping
+    // Backend uses 'total_price' but may or may not include shipping
     if (order.total_price && order.total_price > 0) {
+      // Check if backend already included shipping (shipping_fee > 0)
+      if (order.shipping_fee && order.shipping_fee > 0) {
+        console.log('Using total_price (already includes shipping):', order.total_price);
+        return order.total_price;
+      }
+      
+      // Backend didn't include shipping, add stored shipping fee
       const storedShipping = getStoredShippingFee(order.id);
       const totalWithShipping = order.total_price + storedShipping;
       console.log('Using total_price + stored shipping:', { 
@@ -80,11 +87,16 @@ const Profile: React.FC = () => {
     
     // Check if we have subtotal (backend calculated)
     if (order.subtotal && order.subtotal > 0) {
-      const storedShipping = getStoredShippingFee(order.id);
-      const backendTotal = order.subtotal + storedShipping;
-      console.log('Using subtotal + stored shipping:', { 
+      // Add backend shipping fee if it exists, otherwise add stored shipping
+      const backendShipping = order.shipping_fee || 0;
+      const storedShipping = backendShipping > 0 ? 0 : getStoredShippingFee(order.id);
+      const totalShipping = backendShipping + storedShipping;
+      const backendTotal = order.subtotal + totalShipping;
+      console.log('Using subtotal + shipping:', { 
         subtotal: order.subtotal, 
-        shipping: storedShipping, 
+        backendShipping,
+        storedShipping,
+        totalShipping,
         total: backendTotal 
       });
       return backendTotal;
@@ -97,9 +109,9 @@ const Profile: React.FC = () => {
         const quantity = item.quantity || 1;
         return sum + (price * quantity);
       }, 0);
-      const estimatedShipping = getStoredShippingFee(order.id);
-      const calculatedTotal = itemsTotal + estimatedShipping;
-      console.log('Calculated from items + shipping:', { itemsTotal, shipping: estimatedShipping, calculatedTotal });
+      const storedShipping = getStoredShippingFee(order.id);
+      const calculatedTotal = itemsTotal + storedShipping;
+      console.log('Calculated from items + shipping:', { itemsTotal, shipping: storedShipping, calculatedTotal });
       return calculatedTotal;
     }
     
@@ -110,9 +122,9 @@ const Profile: React.FC = () => {
         const quantity = item.quantity || 1;
         return sum + (price * quantity);
       }, 0);
-      const estimatedShipping = getStoredShippingFee(order.id);
-      const calculatedTotal = itemsTotal + estimatedShipping;
-      console.log('Calculated from order.items + shipping:', { itemsTotal, shipping: estimatedShipping, calculatedTotal });
+      const storedShipping = getStoredShippingFee(order.id);
+      const calculatedTotal = itemsTotal + storedShipping;
+      console.log('Calculated from order.items + shipping:', { itemsTotal, shipping: storedShipping, calculatedTotal });
       return calculatedTotal;
     }
     
@@ -624,7 +636,7 @@ const Profile: React.FC = () => {
                               <tr>
                                 <td className="px-8 py-4 font-bold text-gray-600 italic" colSpan={2}>Shipping</td>
                                 <td className="px-8 py-4 text-right font-black text-gray-900">
-                                  £{getStoredShippingFee(selectedOrder.id).toFixed(2)}
+                                  £{(selectedOrder.shipping_fee > 0 ? selectedOrder.shipping_fee : getStoredShippingFee(selectedOrder.id)).toFixed(2)}
                                 </td>
                               </tr>
                               <tr className="border-t-2 border-pink-200 bg-pink-50">

@@ -1,9 +1,13 @@
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const UserRoute: React.FC = () => {
+interface UserRouteProps {
+  children?: ReactNode;
+}
+
+const UserRoute: React.FC<UserRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -18,7 +22,7 @@ const UserRoute: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default UserRoute;

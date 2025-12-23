@@ -897,15 +897,6 @@ const Cart: React.FC = () => {
                             spacingUnit: '6px',
                             borderRadius: '12px',
                           },
-                          rules: {
-                            '.Input': {
-                              padding: '20px 24px',
-                              width: '100%',
-                            },
-                            '.Input--focus': {
-                              boxShadow: '0 0 0 2px #ec4899',
-                            },
-                          },
                         },
                       }}
                     >

@@ -7,13 +7,13 @@
     <title>BatLuxe Beauty | Luxury Beauty Elevated</title>
     
     <!-- Favicon and App Icons -->
-    <link rel="icon" type="image/x-icon" href="/public/favicon.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="/public/icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/icon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/icon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png">
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/public/manifest.json">
+    <link rel="manifest" href="/manifest.json">
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#ec4899">
@@ -21,7 +21,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="BatLuxe Beauty">
     <meta name="msapplication-TileColor" content="#ec4899">
-    <meta name="msapplication-config" content="/public/browserconfig.xml">
+    <meta name="msapplication-config" content="/browserconfig.xml">
     
     <!-- SEO Meta Tags -->
     <meta name="description" content="BatLuxe Beauty - Luxury Beauty Elevated. Premium beauty products, skincare, and cosmetics for the modern woman.">
@@ -33,13 +33,13 @@
     <meta property="og:description" content="Premium beauty products, skincare, and cosmetics for the modern woman.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://batluxebeauty.com">
-    <meta property="og:image" content="/public/icons/icon-512x512.png">
+    <meta property="og:image" content="/icons/icon-512x512.png">
     
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="BatLuxe Beauty | Luxury Beauty Elevated">
     <meta name="twitter:description" content="Premium beauty products, skincare, and cosmetics for the modern woman.">
-    <meta name="twitter:image" content="/public/icons/icon-512x512.png">
+    <meta name="twitter:image" content="/icons/icon-512x512.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -99,7 +99,7 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/public/sw.js')
+    navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('SW registered: ', registration);
       })

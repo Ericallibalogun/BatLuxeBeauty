@@ -12,7 +12,6 @@ import {
 import api from '../services/api';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 /**
  * STRIPE CONFIGURATION:
@@ -20,103 +19,15 @@ import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
  */
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
-/**
- * PAYPAL CONFIGURATION:
- * Using PayPal client ID for production transactions
- */
-const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'sb'; // 'sb' for sandbox if not set
-
 console.log('Stripe Key Available:', !!STRIPE_PUBLISHABLE_KEY);
 console.log('Stripe Key Prefix:', STRIPE_PUBLISHABLE_KEY?.substring(0, 10));
-console.log('PayPal Client ID Available:', !!PAYPAL_CLIENT_ID);
 
 if (!STRIPE_PUBLISHABLE_KEY) {
   console.error('VITE_STRIPE_PUBLISHABLE_KEY is not set in environment variables');
 }
 
-if (!PAYPAL_CLIENT_ID || PAYPAL_CLIENT_ID === 'sb') {
-  console.warn('VITE_PAYPAL_CLIENT_ID is not set, using sandbox mode');
-}
-
 // Initialize Stripe Promise (as per backend specs)
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
-
-// PayPal Component
-const PayPalCheckout: React.FC<{
-  orderTotal: number;
-  orderData: any;
-  onSuccess: () => void;
-  onError: (error: string) => void;
-}> = ({ orderTotal, orderData, onSuccess, onError }) => {
-  const [paypalLoading, setPaypalLoading] = useState(false);
-
-  return (
-    <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
-      <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
-        PayPal Checkout
-      </label>
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        {paypalLoading && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-blue-500 animate-spin mr-3" />
-            <span className="text-gray-500 font-medium">Loading PayPal...</span>
-          </div>
-        )}
-        <PayPalButtons
-          style={{
-            layout: 'vertical',
-            color: 'blue',
-            shape: 'rect',
-            label: 'paypal',
-            height: 48,
-          }}
-          createOrder={(data, actions) => {
-            return actions.order.create({
-              intent: 'CAPTURE',
-              purchase_units: [
-                {
-                  amount: {
-                    value: orderTotal.toFixed(2),
-                    currency_code: 'GBP',
-                  },
-                  description: 'BatLuxe Beauty Order',
-                },
-              ],
-            });
-          }}
-          onApprove={async (data, actions) => {
-            setPaypalLoading(true);
-            try {
-              const details = await actions.order?.capture();
-              console.log('PayPal payment completed:', details);
-              
-              // Here you would typically send the PayPal transaction details to your backend
-              // For now, we'll simulate success
-              onSuccess();
-            } catch (error) {
-              console.error('PayPal payment error:', error);
-              onError('PayPal payment failed. Please try again.');
-            } finally {
-              setPaypalLoading(false);
-            }
-          }}
-          onError={(err) => {
-            console.error('PayPal error:', err);
-            onError('PayPal payment failed. Please try again.');
-            setPaypalLoading(false);
-          }}
-          onCancel={() => {
-            console.log('PayPal payment cancelled');
-            setPaypalLoading(false);
-          }}
-        />
-      </div>
-      <p className="text-xs text-gray-500 mt-3 text-center font-medium">
-        Secure payment with PayPal
-      </p>
-    </div>
-  );
-};
 
 // Enhanced Stripe Checkout Form Component with PayPal and Apple Pay support
 const CheckoutForm: React.FC<{ 
@@ -325,21 +236,6 @@ const CheckoutForm: React.FC<{
   // Real Stripe form with multiple payment options
   return (
     <div className="space-y-6 w-full">
-      {/* PayPal Payment Option */}
-      <PayPalCheckout
-        orderTotal={orderTotal}
-        orderData={orderData}
-        onSuccess={onSuccess}
-        onError={onError}
-      />
-
-      {/* Divider */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-px bg-gray-200"></div>
-        <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Or</span>
-        <div className="flex-1 h-px bg-gray-200"></div>
-      </div>
-
       {/* Digital Wallet Payments (Apple Pay, Google Pay, etc.) */}
       {canMakePayment && paymentRequest && (
         <>
@@ -1159,43 +1055,35 @@ const Cart: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Payment Providers */}
+                    {/* Stripe Elements Provider (as per backend specs) */}
                     {/* Force re-render when clientSecret changes by using key */}
-                    <PayPalScriptProvider
+                    <Elements 
+                      key={clientSecret} // This forces re-render when clientSecret changes
+                      stripe={stripePromise}
                       options={{
-                        clientId: PAYPAL_CLIENT_ID,
-                        currency: "GBP",
-                        intent: "capture",
+                        clientSecret: clientSecret,
+                        appearance: {
+                          theme: 'stripe',
+                          variables: {
+                            colorPrimary: '#ec4899',
+                            colorBackground: '#ffffff',
+                            colorText: '#111827',
+                            colorDanger: '#ef4444',
+                            fontFamily: 'Poppins, sans-serif',
+                            spacingUnit: '6px',
+                            borderRadius: '12px',
+                          },
+                        },
                       }}
                     >
-                      <Elements 
-                        key={clientSecret} // This forces re-render when clientSecret changes
-                        stripe={stripePromise}
-                        options={{
-                          clientSecret: clientSecret,
-                          appearance: {
-                            theme: 'stripe',
-                            variables: {
-                              colorPrimary: '#ec4899',
-                              colorBackground: '#ffffff',
-                              colorText: '#111827',
-                              colorDanger: '#ef4444',
-                              fontFamily: 'Poppins, sans-serif',
-                              spacingUnit: '6px',
-                              borderRadius: '12px',
-                            },
-                          },
-                        }}
-                      >
-                        <CheckoutForm 
-                          clientSecret={clientSecret}
-                          onSuccess={handlePaymentSuccess}
-                          onError={handlePaymentError}
-                          orderTotal={orderData?.total_price || (total + selectedShipping.fee)}
-                          orderData={orderData}
-                        />
-                      </Elements>
-                    </PayPalScriptProvider>
+                      <CheckoutForm 
+                        clientSecret={clientSecret}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        orderTotal={orderData?.total_price || (total + selectedShipping.fee)}
+                        orderData={orderData}
+                      />
+                    </Elements>
                   </div>
                 )}
               </>

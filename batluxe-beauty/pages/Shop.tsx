@@ -33,10 +33,15 @@ const ProductCard = React.memo(({
   isWishlistLoading: boolean;
   isInWishlist: boolean;
 }) => {
-  usePerformanceMonitor(`ProductCard-${product.id}`);
-
-  const handleCardClick = () => {
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Prevent navigation if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    
     console.log('🖱️ Product card clicked:', product.id, product.name);
+    console.log('🔍 Navigating to:', `/product/${product.id}`);
     onNavigate(product.id);
   };
 
@@ -138,8 +143,6 @@ const ProductCard = React.memo(({
 });
 
 const Shop: React.FC = () => {
-  usePerformanceMonitor('Shop');
-  
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

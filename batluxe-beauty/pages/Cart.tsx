@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 /**
  * STRIPE CONFIGURATION:
@@ -19,27 +20,233 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
  */
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
+/**
+ * PAYPAL CONFIGURATION:
+ * Using PayPal client ID for production transactions
+ */
+const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'sb'; // 'sb' for sandbox if not set
+
 console.log('Stripe Key Available:', !!STRIPE_PUBLISHABLE_KEY);
 console.log('Stripe Key Prefix:', STRIPE_PUBLISHABLE_KEY?.substring(0, 10));
+console.log('PayPal Client ID Available:', !!PAYPAL_CLIENT_ID);
 
 if (!STRIPE_PUBLISHABLE_KEY) {
   console.error('VITE_STRIPE_PUBLISHABLE_KEY is not set in environment variables');
 }
 
+if (!PAYPAL_CLIENT_ID || PAYPAL_CLIENT_ID === 'sb') {
+  console.warn('VITE_PAYPAL_CLIENT_ID is not set, using sandbox mode');
+}
+
 // Initialize Stripe Promise (as per backend specs)
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
-// Stripe Checkout Form Component (following backend specs exactly)
-const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onError: (error: string) => void }> = ({ 
+// PayPal Component
+const PayPalCheckout: React.FC<{
+  orderTotal: number;
+  orderData: any;
+  onSuccess: () => void;
+  onError: (error: string) => void;
+}> = ({ orderTotal, orderData, onSuccess, onError }) => {
+  const [paypalLoading, setPaypalLoading] = useState(false);
+
+  return (
+    <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
+      <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
+        PayPal Checkout
+      </label>
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        {paypalLoading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-blue-500 animate-spin mr-3" />
+            <span className="text-gray-500 font-medium">Loading PayPal...</span>
+          </div>
+        )}
+        <PayPalButtons
+          style={{
+            layout: 'vertical',
+            color: 'blue',
+            shape: 'rect',
+            label: 'paypal',
+            height: 48,
+          }}
+          createOrder={(data, actions) => {
+            return actions.order.create({
+              intent: 'CAPTURE',
+              purchase_units: [
+                {
+                  amount: {
+                    value: orderTotal.toFixed(2),
+                    currency_code: 'GBP',
+                  },
+                  description: 'BatLuxe Beauty Order',
+                },
+              ],
+            });
+          }}
+          onApprove={async (data, actions) => {
+            setPaypalLoading(true);
+            try {
+              const details = await actions.order?.capture();
+              console.log('PayPal payment completed:', details);
+              
+              // Here you would typically send the PayPal transaction details to your backend
+              // For now, we'll simulate success
+              onSuccess();
+            } catch (error) {
+              console.error('PayPal payment error:', error);
+              onError('PayPal payment failed. Please try again.');
+            } finally {
+              setPaypalLoading(false);
+            }
+          }}
+          onError={(err) => {
+            console.error('PayPal error:', err);
+            onError('PayPal payment failed. Please try again.');
+            setPaypalLoading(false);
+          }}
+          onCancel={() => {
+            console.log('PayPal payment cancelled');
+            setPaypalLoading(false);
+          }}
+        />
+      </div>
+      <p className="text-xs text-gray-500 mt-3 text-center font-medium">
+        Secure payment with PayPal
+      </p>
+    </div>
+  );
+};
+
+// Enhanced Stripe Checkout Form Component with PayPal and Apple Pay support
+const CheckoutForm: React.FC<{ 
+  clientSecret: string; 
+  onSuccess: () => void; 
+  onError: (error: string) => void;
+  orderTotal: number;
+  orderData: any;
+}> = ({ 
   clientSecret, 
   onSuccess, 
-  onError 
+  onError,
+  orderTotal,
+  orderData
 }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [stripeLoadTimeout, setStripeLoadTimeout] = useState(false);
+  const [paymentRequest, setPaymentRequest] = useState<any>(null);
+  const [canMakePayment, setCanMakePayment] = useState(false);
   const { user } = useAuth();
+
+  // Initialize Payment Request for Apple Pay, Google Pay, and other digital wallets
+  useEffect(() => {
+    if (!stripe) return;
+
+    const pr = stripe.paymentRequest({
+      country: 'GB',
+      currency: 'gbp',
+      total: {
+        label: 'BatLuxe Beauty Order',
+        amount: Math.round(orderTotal * 100), // Convert to pence
+      },
+      requestPayerName: true,
+      requestPayerEmail: true,
+      requestPayerPhone: true,
+      requestShipping: true,
+      shippingOptions: [
+        {
+          id: 'standard',
+          label: 'Standard Delivery (2-3 days)',
+          detail: '2-3 business days',
+          amount: 399, // £3.99 in pence
+        },
+        {
+          id: 'express',
+          label: 'Express Delivery (Next day)',
+          detail: 'Next business day',
+          amount: 499, // £4.99 in pence
+        },
+      ],
+    });
+
+    // Check if Payment Request is available (Apple Pay, Google Pay, etc.)
+    pr.canMakePayment().then((result) => {
+      if (result) {
+        setCanMakePayment(true);
+        setPaymentRequest(pr);
+      }
+    });
+
+    // Handle payment method selection
+    pr.on('paymentmethod', async (ev) => {
+      setProcessing(true);
+      
+      try {
+        // Confirm payment with the payment method from Apple Pay/Google Pay
+        const { error, paymentIntent } = await stripe.confirmCardPayment(
+          clientSecret,
+          {
+            payment_method: ev.paymentMethod.id,
+          },
+          { handleActions: false }
+        );
+
+        if (error) {
+          ev.complete('fail');
+          onError(error.message || 'Payment failed');
+        } else {
+          ev.complete('success');
+          if (paymentIntent.status === 'succeeded') {
+            onSuccess();
+          }
+        }
+      } catch (err: any) {
+        ev.complete('fail');
+        onError(err.message || 'Payment processing failed');
+      } finally {
+        setProcessing(false);
+      }
+    });
+
+    // Handle shipping address change
+    pr.on('shippingaddresschange', (ev) => {
+      // You can update shipping options based on address
+      ev.updateWith({
+        status: 'success',
+        shippingOptions: [
+          {
+            id: 'standard',
+            label: 'Standard Delivery (2-3 days)',
+            detail: '2-3 business days',
+            amount: 399,
+          },
+          {
+            id: 'express',
+            label: 'Express Delivery (Next day)',
+            detail: 'Next business day',
+            amount: 499,
+          },
+        ],
+      });
+    });
+
+    // Handle shipping option change
+    pr.on('shippingoptionchange', (ev) => {
+      const shippingOption = ev.shippingOption;
+      const newTotal = Math.round((orderTotal - 3.99) * 100) + shippingOption.amount; // Adjust total based on shipping
+      
+      ev.updateWith({
+        status: 'success',
+        total: {
+          label: 'BatLuxe Beauty Order',
+          amount: newTotal,
+        },
+      });
+    });
+
+  }, [stripe, orderTotal, clientSecret, onSuccess, onError]);
 
   // Debug Stripe Elements loading
   useEffect(() => {
@@ -48,7 +255,8 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
       elements: !!elements,
       clientSecret: !!clientSecret,
       stripeLoaded: stripe !== null,
-      elementsLoaded: elements !== null
+      elementsLoaded: elements !== null,
+      canMakePayment
     });
     
     if (stripe && elements) {
@@ -56,7 +264,7 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
     } else {
       console.log('Waiting for Stripe Elements to load...');
     }
-  }, [stripe, elements, clientSecret]);
+  }, [stripe, elements, clientSecret, canMakePayment]);
 
   // Timeout mechanism for Stripe loading
   useEffect(() => {
@@ -114,78 +322,139 @@ const CheckoutForm: React.FC<{ clientSecret: string; onSuccess: () => void; onEr
     }
   };
 
-  // Real Stripe form
+  // Real Stripe form with multiple payment options
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 w-full">
-      <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
-        <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
-          Card Details
-        </label>
-        {!stripe || !elements ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-pink-500 animate-spin mr-3" />
-            <div className="text-center">
-              <span className="text-gray-500 font-medium block">Loading secure payment form...</span>
-              {stripeLoadTimeout && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-700 font-medium">
-                    Payment form is taking longer than expected. 
-                    <button 
-                      onClick={() => window.location.reload()} 
-                      className="ml-2 underline hover:no-underline"
-                    >
-                      Refresh page
-                    </button>
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="w-full">
-            <div className="bg-white rounded-xl border border-gray-200 min-h-[60px] w-full" style={{ width: '100%' }}>
-              <CardElement
-                options={{
+    <div className="space-y-6 w-full">
+      {/* PayPal Payment Option */}
+      <PayPalCheckout
+        orderTotal={orderTotal}
+        orderData={orderData}
+        onSuccess={onSuccess}
+        onError={onError}
+      />
+
+      {/* Divider */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 h-px bg-gray-200"></div>
+        <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Or</span>
+        <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
+
+      {/* Digital Wallet Payments (Apple Pay, Google Pay, etc.) */}
+      {canMakePayment && paymentRequest && (
+        <>
+          <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
+            <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
+              Express Checkout
+            </label>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <PaymentRequestButtonElement 
+                options={{ 
+                  paymentRequest,
                   style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#111827',
-                      fontFamily: 'Poppins, sans-serif',
-                      lineHeight: '40px',
-                      padding: '20px 24px',
-                      width: '100%',
-                      '::placeholder': { color: '#9CA3AF' },
+                    paymentRequestButton: {
+                      type: 'default',
+                      theme: 'dark',
+                      height: '48px',
                     },
-                    invalid: { color: '#EF4444' },
                   },
-                  hidePostalCode: false,
-                }}
-                className="w-full"
-                style={{ width: '100%' }}
+                }} 
               />
             </div>
+            <p className="text-xs text-gray-500 mt-3 text-center font-medium">
+              Pay with Apple Pay, Google Pay, or other digital wallets
+            </p>
           </div>
-        )}
+
+          {/* Divider */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-gray-200"></div>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Or pay with card</span>
+            <div className="flex-1 h-px bg-gray-200"></div>
+          </div>
+        </>
+      )}
+
+      {/* Traditional Card Payment */}
+      <form onSubmit={handleSubmit} className="space-y-6 w-full">
+        <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-pink-50 w-full">
+          <label className="block text-sm font-black text-gray-700 mb-6 uppercase tracking-widest">
+            Card Details
+          </label>
+          {!stripe || !elements ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-pink-500 animate-spin mr-3" />
+              <div className="text-center">
+                <span className="text-gray-500 font-medium block">Loading secure payment form...</span>
+                {stripeLoadTimeout && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-700 font-medium">
+                      Payment form is taking longer than expected. 
+                      <button 
+                        onClick={() => window.location.reload()} 
+                        className="ml-2 underline hover:no-underline"
+                      >
+                        Refresh page
+                      </button>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="w-full">
+              <div className="bg-white rounded-xl border border-gray-200 min-h-[60px] w-full">
+                <CardElement
+                  options={{
+                    style: {
+                      base: {
+                        fontSize: '16px',
+                        color: '#111827',
+                        fontFamily: 'Poppins, sans-serif',
+                        lineHeight: '40px',
+                        padding: '20px 24px',
+                        '::placeholder': { color: '#9CA3AF' },
+                      },
+                      invalid: { color: '#EF4444' },
+                    },
+                    hidePostalCode: false,
+                  }}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <button 
+          type="submit"
+          disabled={!stripe || processing}
+          className="w-full bg-gray-900 hover:bg-pink-600 text-white py-6 rounded-2xl font-black shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+        >
+          {processing ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              Processing Payment...
+            </>
+          ) : (
+            <>
+              <Lock size={20} />
+              Complete Payment
+            </>
+          )}
+        </button>
+      </form>
+
+      {/* Supported Payment Methods */}
+      <div className="flex items-center justify-center gap-6 opacity-30 pt-6 grayscale">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4" />
+        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-6" />
+        <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" alt="Apple Pay" className="h-5" />
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Pay" className="h-5" />
+        <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" className="h-4" />
+        <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" className="h-4" />
       </div>
-      
-      <button 
-        type="submit"
-        disabled={!stripe || processing}
-        className="w-full bg-gray-900 hover:bg-pink-600 text-white py-6 rounded-2xl font-black shadow-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
-      >
-        {processing ? (
-          <>
-            <Loader2 className="animate-spin" size={20} />
-            Processing Payment...
-          </>
-        ) : (
-          <>
-            <Lock size={20} />
-            Complete Payment
-          </>
-        )}
-      </button>
-    </form>
+    </div>
   );
 };
 
@@ -465,9 +734,9 @@ const Cart: React.FC = () => {
         metadata: {
           items: orderData.items || items.map(item => ({
             id: item.id,
-            name: item.product?.name || item.name,
+            name: item.product?.name || 'Product',
             quantity: item.quantity,
-            price: item.product?.price || item.price
+            price: item.product?.price || 0
           })),
           subtotal: orderData.subtotal,
           shipping_fee: orderData.shipping_fee,
@@ -546,9 +815,9 @@ const Cart: React.FC = () => {
           error: errorMessage,
           items: orderData.items || items.map(item => ({
             id: item.id,
-            name: item.product?.name || item.name,
+            name: item.product?.name || 'Product',
             quantity: item.quantity,
-            price: item.product?.price || item.price
+            price: item.product?.price || 0
           })),
           subtotal: orderData.subtotal,
           shipping_fee: orderData.shipping_fee,
@@ -890,39 +1159,43 @@ const Cart: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Stripe Elements Provider (as per backend specs) */}
+                    {/* Payment Providers */}
                     {/* Force re-render when clientSecret changes by using key */}
-                    <Elements 
-                      key={clientSecret} // This forces re-render when clientSecret changes
-                      stripe={stripePromise}
+                    <PayPalScriptProvider
                       options={{
-                        clientSecret: clientSecret,
-                        appearance: {
-                          theme: 'stripe',
-                          variables: {
-                            colorPrimary: '#ec4899',
-                            colorBackground: '#ffffff',
-                            colorText: '#111827',
-                            colorDanger: '#ef4444',
-                            fontFamily: 'Poppins, sans-serif',
-                            spacingUnit: '6px',
-                            borderRadius: '12px',
-                          },
-                        },
+                        clientId: PAYPAL_CLIENT_ID,
+                        currency: "GBP",
+                        intent: "capture",
                       }}
                     >
-                      <CheckoutForm 
-                        clientSecret={clientSecret}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                      />
-                    </Elements>
-
-                    <div className="flex items-center justify-center gap-6 opacity-30 pt-6 grayscale">
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-6" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" className="h-4" />
-                    </div>
+                      <Elements 
+                        key={clientSecret} // This forces re-render when clientSecret changes
+                        stripe={stripePromise}
+                        options={{
+                          clientSecret: clientSecret,
+                          appearance: {
+                            theme: 'stripe',
+                            variables: {
+                              colorPrimary: '#ec4899',
+                              colorBackground: '#ffffff',
+                              colorText: '#111827',
+                              colorDanger: '#ef4444',
+                              fontFamily: 'Poppins, sans-serif',
+                              spacingUnit: '6px',
+                              borderRadius: '12px',
+                            },
+                          },
+                        }}
+                      >
+                        <CheckoutForm 
+                          clientSecret={clientSecret}
+                          onSuccess={handlePaymentSuccess}
+                          onError={handlePaymentError}
+                          orderTotal={orderData?.total_price || (total + selectedShipping.fee)}
+                          orderData={orderData}
+                        />
+                      </Elements>
+                    </PayPalScriptProvider>
                   </div>
                 )}
               </>

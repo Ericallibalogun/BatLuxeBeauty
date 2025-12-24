@@ -19,6 +19,8 @@ import About from './pages/About';
 import Login from './pages/Login';
 import AdminLogin from './pages/AdminLogin';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import AccessDenied from './pages/AccessDenied';
 import AdminDashboard from './pages/AdminDashboard';
 import Cart from './pages/Cart';
@@ -53,6 +55,8 @@ const App: React.FC = () => {
                   <Route path="/login" element={<Login />} />
                   <Route path="/admin-login" element={<AdminLogin />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/faqs" element={<FAQs />} />
                   <Route path="/shipping" element={<ShippingPolicy />} />
                   <Route path="/terms" element={<Terms />} />

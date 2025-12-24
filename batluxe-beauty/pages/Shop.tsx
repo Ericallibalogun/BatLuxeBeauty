@@ -14,16 +14,8 @@ import Pagination from '../components/Pagination';
 import ProductCard from '../components/ProductCard';
 import { imagePreloader } from '../utils/imagePreloader';
 
-// Test import to force ProductDetail to be included in bundle
-import ProductDetail from './ProductDetail';
-
-// ProductCard is now imported from ../components/ProductCard
-
 const Shop: React.FC = () => {
-  console.log('🏪 Shop component mounted');
-  console.log('🧪 ProductDetail component available:', !!ProductDetail);
   const navigate = useNavigate();
-  console.log('🔍 Navigate function:', typeof navigate);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -54,22 +46,17 @@ const Shop: React.FC = () => {
       // Check cache first
       const cachedProducts = productCache.get();
       if (cachedProducts) {
-        console.log('📦 Using cached products:', cachedProducts.length);
         setProducts(cachedProducts);
         setLoading(false);
         return;
       }
 
       try {
-        console.log('🌐 Fetching products from API...');
         const response = await api.get('/products');
         const rawData = response.data;
         const productsArray = Array.isArray(rawData)
           ? rawData
           : (rawData?.products || rawData?.data || []);
-
-        console.log('📦 Fetched products:', productsArray.length);
-        console.log('📦 First product:', productsArray[0]);
 
         setProducts(productsArray);
         productCache.set(productsArray); // Cache the results
@@ -203,41 +190,6 @@ const Shop: React.FC = () => {
           <span className="text-pink-500 font-black tracking-[0.4em] uppercase text-[10px] mb-4 block">The Collection</span>
           <h1 className="text-6xl font-black text-gray-900 mb-6 italic tracking-tight">Luxury Defined</h1>
           <p className="text-gray-400 font-medium max-w-2xl mx-auto">Discover our masterfully curated collection of high-end beauty essentials designed to elevate your aesthetic journey.</p>
-
-          {/* Debug Navigation Test */}
-          <div className="mt-6">
-            <button
-              onClick={() => {
-                console.log('🧪 Test navigation button clicked');
-                console.log('🧪 Current URL:', window.location.href);
-                navigate('/product/test-id');
-              }}
-              className="bg-red-500 text-white px-4 py-2 rounded text-sm mr-4"
-            >
-              🧪 Test Navigation (Debug)
-            </button>
-            <button
-              onClick={() => {
-                console.log('🧪 Products loaded:', products.length);
-                if (products.length > 0) {
-                  console.log('🧪 First product:', products[0]);
-                  navigate(`/product/${products[0].id}`);
-                }
-              }}
-              className="bg-blue-500 text-white px-4 py-2 rounded text-sm mr-4"
-            >
-              🧪 Navigate to First Product
-            </button>
-            <button
-              onClick={() => {
-                console.log('🧪 Direct URL change test');
-                window.location.hash = '#/product/test-direct';
-              }}
-              className="bg-green-500 text-white px-4 py-2 rounded text-sm"
-            >
-              🧪 Direct Hash Change
-            </button>
-          </div>
         </div>
 
         {/* Search & Filters */}
@@ -286,19 +238,6 @@ const Shop: React.FC = () => {
               <span className="text-pink-500 ml-2">({products.length} total)</span>
             )}
           </p>
-          {/* Debug: Test direct navigation */}
-          {paginatedProducts.length > 0 && (
-            <button
-              onClick={() => {
-                const firstProduct = paginatedProducts[0];
-                console.log('🧪 Testing direct navigation to:', firstProduct.id);
-                navigate(`/product/${firstProduct.id}`);
-              }}
-              className="bg-red-500 text-white px-4 py-2 rounded text-xs"
-            >
-              Test Navigate
-            </button>
-          )}
         </div>
 
         {/* Products Grid */}
@@ -315,6 +254,9 @@ const Shop: React.FC = () => {
                 onAddToCart={handleAddToCart}
                 onToggleWishlist={() => handleToggleWishlist(product)}
                 isWishlisted={isInWishlist(product.id)}
+                isAddingToCart={addingMap[product.id]}
+                addSuccess={successMap[product.id]}
+                wishlistLoading={wishlistLoading[product.id]}
               />
             ))
           ) : (

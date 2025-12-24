@@ -92,7 +92,13 @@ const Login: React.FC = () => {
             </button>
           </form>
 
-          <div className="mt-12 text-center">
+          <div className="mt-8 text-center">
+            <Link to="/forgot-password" className="text-pink-600 font-bold text-sm hover:underline">
+              Forgot Password?
+            </Link>
+          </div>
+
+          <div className="mt-6 text-center">
             <p className="text-gray-400 font-bold text-sm">
               New to BatLuxe? <Link to="/signup" className="text-pink-600 font-black hover:underline ml-2">Register Identity</Link>
             </p>

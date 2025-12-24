@@ -11,129 +11,13 @@ import { useDebounce } from '../hooks/useDebounce';
 import { usePerformanceMonitor } from '../hooks/usePerformanceMonitor';
 import FastImage from '../components/FastImage';
 import Pagination from '../components/Pagination';
+import ProductCard from '../components/ProductCard';
 import { imagePreloader } from '../utils/imagePreloader';
 
 // Test import to force ProductDetail to be included in bundle
 import ProductDetail from './ProductDetail';
 
-// Memoized ProductCard component to prevent unnecessary re-renders
-const ProductCard = React.memo(({
-  product,
-  onAddToCart,
-  onToggleWishlist,
-  onNavigate,
-  isAddingToCart,
-  isAddedToCart,
-  isWishlistLoading,
-  isInWishlist
-}: {
-  product: Product;
-  onAddToCart: (product: Product) => void;
-  onToggleWishlist: (product: Product) => void;
-  onNavigate: (id: string) => void;
-  isAddingToCart: boolean;
-  isAddedToCart: boolean;
-  isWishlistLoading: boolean;
-  isInWishlist: boolean;
-}) => {
-  const handleWishlistClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    console.log('❤️ Wishlist clicked:', product.id);
-    onToggleWishlist(product);
-  };
-
-  const handleAddToCartClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    console.log('🛍️ Add to cart clicked:', product.id);
-    onAddToCart(product);
-  };
-
-  return (
-    <div
-      onClick={() => onNavigate(product.id)}
-      className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-pink-50 flex flex-col relative cursor-pointer"
-    >
-      <button
-        onClick={handleWishlistClick}
-        disabled={isWishlistLoading}
-        className={`absolute top-3 right-3 z-30 w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-md shadow-md transition-all active:scale-90 border border-white/20 ${isWishlistLoading
-            ? 'bg-gray-200 text-gray-400'
-            : isInWishlist
-              ? 'bg-pink-500 text-white shadow-pink-200'
-              : 'bg-white/80 text-gray-400 hover:text-pink-500 hover:bg-pink-50'
-          }`}
-      >
-        {isWishlistLoading ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <Heart
-            size={16}
-            fill={isInWishlist ? 'currentColor' : 'none'}
-            className={isInWishlist ? 'text-white' : 'text-gray-400'}
-          />
-        )}
-      </button>
-
-      <div className="relative h-48 overflow-hidden">
-        <img
-          src={product.image_url || 'https://picsum.photos/400/400'}
-          alt={product.name}
-          className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
-          loading="lazy"
-        />
-        <div className="absolute top-3 left-3">
-          <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
-            {product.category || 'Beauty'}
-          </span>
-        </div>
-        {/* Click indicator overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-300 flex items-center justify-center">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 text-xs font-bold text-gray-900">
-            View Details
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 flex flex-col flex-grow">
-        <h3 className="text-base font-black text-gray-900 mb-1 italic truncate group-hover:text-pink-600 transition-colors">{product.name}</h3>
-        <p className="text-lg font-black text-pink-500 mb-2">£{(product.price || 0).toFixed(2)}</p>
-
-        <div className="mb-3">
-          <p className="text-xs text-gray-400 font-medium line-clamp-1">{product.description}</p>
-        </div>
-
-        <div className="mt-auto">
-          <div className="bg-green-50/50 text-green-700 text-[8px] py-1 px-2 rounded-full mb-3 font-black uppercase tracking-widest border border-green-100/50 inline-block">
-            {product.stock} available
-          </div>
-
-          <button
-            onClick={handleAddToCartClick}
-            disabled={isAddingToCart || isAddedToCart}
-            className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${isAddedToCart
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-900 hover:bg-pink-600 text-white'
-              }`}
-          >
-            {isAddingToCart ? (
-              <Loader2 className="animate-spin" size={14} />
-            ) : isAddedToCart ? (
-              <>
-                <Check size={14} /> Added to Cart
-              </>
-            ) : (
-              <>
-                <ShoppingCart size={14} /> Add to Cart
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
+// ProductCard is now imported from ../components/ProductCard
 
 const Shop: React.FC = () => {
   console.log('🏪 Shop component mounted');
@@ -224,24 +108,7 @@ const Shop: React.FC = () => {
     }, 500);
   }, [toggleWishlist]);
 
-  const handleNavigateToProduct = useCallback((productId: string) => {
-    console.log('🔍 Navigating to product:', productId);
-    console.log('🔍 Navigation URL:', `/product/${productId}`);
-    console.log('🔍 Current location:', window.location.href);
-    console.log('🔍 Navigate function:', typeof navigate);
-
-    try {
-      navigate(`/product/${productId}`);
-      console.log('✅ Navigation called successfully');
-
-      // Additional debug: Check if URL actually changed
-      setTimeout(() => {
-        console.log('🔍 URL after navigation:', window.location.href);
-      }, 100);
-    } catch (error) {
-      console.error('❌ Navigation error:', error);
-    }
-  }, [navigate]);
+  // handleNavigateToProduct was removed since ProductCard now uses <Link> directly
 
   // Optimized filtering and sorting with memoization
   const filteredAndSortedProducts = useMemo(() => {
@@ -446,12 +313,8 @@ const Shop: React.FC = () => {
                 key={product.id}
                 product={product}
                 onAddToCart={handleAddToCart}
-                onToggleWishlist={handleToggleWishlist}
-                onNavigate={handleNavigateToProduct}
-                isAddingToCart={addingMap[product.id] || false}
-                isAddedToCart={successMap[product.id] || false}
-                isWishlistLoading={wishlistLoading[product.id] || false}
-                isInWishlist={isInWishlist(product.id)}
+                onToggleWishlist={() => handleToggleWishlist(product)}
+                isWishlisted={isInWishlist(product.id)}
               />
             ))
           ) : (

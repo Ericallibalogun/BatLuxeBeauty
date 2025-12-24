@@ -201,6 +201,7 @@ const Cart: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderData, setOrderData] = useState<any>(null); // Store complete order data from backend
   
   // Shipping options
   const [selectedShipping, setSelectedShipping] = useState<{
@@ -347,11 +348,12 @@ const Cart: React.FC = () => {
     setCheckoutStep('creating_order');
 
     try {
-      // Create Order with exact payload structure + shipping fee
+      // Create Order with updated payload structure
       const orderPayload = {
         customer_name: shippingData.customer_name,
         customer_email: user.email,
         customer_phone: shippingData.customer_phone,
+        delivery_type: selectedShipping.type, // Use delivery_type instead of shipping_fee
         shipping_address: {
           street: shippingData.shipping_address.street,
           city: shippingData.shipping_address.city,
@@ -359,7 +361,6 @@ const Cart: React.FC = () => {
           country: shippingData.shipping_address.country,
           postal_code: shippingData.shipping_address.postal_code
         },
-        shipping_fee: selectedShipping.fee, // Send it even though backend ignores it
         items: items.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity
@@ -368,65 +369,28 @@ const Cart: React.FC = () => {
       };
 
       console.log('Creating order with payload:', orderPayload);
-      console.log('Cart total:', total, 'Shipping fee:', selectedShipping.fee, 'Final total:', total + selectedShipping.fee);
-      console.log('Cart items:', items.map(item => ({ 
-        name: item.product?.name, 
-        price: item.product?.price, 
-        quantity: item.quantity,
-        product_id: item.product_id
-      })));
+      console.log('Cart total:', total, 'Selected shipping:', selectedShipping);
 
       const orderResponse = await api.post('/orders', orderPayload);
       const orderData = orderResponse.data;
       
       console.log('Order creation response:', orderData);
-      console.log('Created order total_price:', orderData.total_price);
-      console.log('Created order subtotal:', orderData.subtotal);
-      console.log('Created order shipping_fee:', orderData.shipping_fee);
+      console.log('Backend calculated total_price:', orderData.total_price);
+      console.log('Backend calculated subtotal:', orderData.subtotal);
+      console.log('Backend calculated shipping_fee:', orderData.shipping_fee);
 
-      // Store the shipping fee locally since backend doesn't store it properly
       const rawOrderId = orderData.id || orderData.ID || orderData._id;
       
       if (!rawOrderId) {
         throw new Error("Order created, but the server did not return a valid resource identifier.");
       }
 
-      // Don't clean the order ID - use it as returned by the backend
       const orderId = String(rawOrderId).trim();
       setOrderId(orderId);
-      
-      if (orderId) {
-        const orderShippingData = {
-          orderId: orderId,
-          shippingFee: selectedShipping.fee,
-          shippingType: selectedShipping.type,
-          timestamp: Date.now()
-        };
-        
-        // Get existing shipping data
-        const existingData = localStorage.getItem('order_shipping_fees');
-        const shippingFees = existingData ? JSON.parse(existingData) : {};
-        
-        // Add this order's shipping fee
-        shippingFees[orderId] = orderShippingData;
-        
-        // Store back to localStorage
-        localStorage.setItem('order_shipping_fees', JSON.stringify(shippingFees));
-        
-        // Clean up old entries (older than 30 days)
-        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-        Object.keys(shippingFees).forEach(id => {
-          if (shippingFees[id].timestamp < thirtyDaysAgo) {
-            delete shippingFees[id];
-          }
-        });
-        localStorage.setItem('order_shipping_fees', JSON.stringify(shippingFees));
-        
-        console.log('Stored shipping fee for order:', orderShippingData);
-      }
+      setOrderData(orderData); // Store complete order data for webhook
       
       console.log('Order created successfully:', orderId);
-      console.log('Full order response:', orderData);
+      console.log('Backend total will be used for payment:', orderData.total_price);
 
       // Initialize Payment (EXACTLY as per backend specs)
       setCheckoutStep('syncing');
@@ -491,21 +455,23 @@ const Cart: React.FC = () => {
     setCheckoutStep('success');
     
     // Process webhook for payment success
-    if (orderId && clientSecret) {
+    if (orderId && clientSecret && orderData) {
       const webhookPayload = {
         orderId: orderId,
         paymentIntentId: clientSecret?.split('_secret_')[0] || 'unknown', // Extract payment intent ID safely
-        amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+        amount: Math.round((orderData.total_price || 0) * 100), // Use backend total converted to cents
         currency: 'gbp',
         customerEmail: user?.email,
         metadata: {
-          items: items.map(item => ({
+          items: orderData.items || items.map(item => ({
             id: item.id,
-            name: item.name,
+            name: item.product?.name || item.name,
             quantity: item.quantity,
-            price: item.price
+            price: item.product?.price || item.price
           })),
-          shipping: selectedShipping
+          subtotal: orderData.subtotal,
+          shipping_fee: orderData.shipping_fee,
+          delivery_type: orderData.delivery_type
         }
       };
       
@@ -569,22 +535,24 @@ const Cart: React.FC = () => {
     setCheckoutStep('payment_form');
     
     // Process webhook for payment failure
-    if (orderId && clientSecret) {
+    if (orderId && clientSecret && orderData) {
       const webhookPayload = {
         orderId: orderId,
         paymentIntentId: clientSecret?.split('_secret_')[0] || 'unknown', // Extract payment intent ID safely
-        amount: Math.round((total + selectedShipping.fee) * 100), // Convert to cents
+        amount: Math.round((orderData.total_price || 0) * 100), // Use backend total converted to cents
         currency: 'gbp',
         customerEmail: user?.email,
         metadata: {
           error: errorMessage,
-          items: items.map(item => ({
+          items: orderData.items || items.map(item => ({
             id: item.id,
-            name: item.name,
+            name: item.product?.name || item.name,
             quantity: item.quantity,
-            price: item.price
+            price: item.product?.price || item.price
           })),
-          shipping: selectedShipping
+          subtotal: orderData.subtotal,
+          shipping_fee: orderData.shipping_fee,
+          delivery_type: orderData.delivery_type
         }
       };
       
@@ -890,7 +858,7 @@ const Cart: React.FC = () => {
                     <div className="mb-8 text-left">
                       <h2 className="text-3xl font-black text-gray-900 italic mb-2 tracking-tight">Secure Payment</h2>
                       <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">
-                        Investment Value: <span className="text-pink-500 font-black">£{(total + selectedShipping.fee).toFixed(2)}</span>
+                        Investment Value: <span className="text-pink-500 font-black">£{orderData?.total_price?.toFixed(2) || (total + selectedShipping.fee).toFixed(2)}</span>
                       </p>
                     </div>
 

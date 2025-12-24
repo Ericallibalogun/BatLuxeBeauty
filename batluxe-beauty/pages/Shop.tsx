@@ -35,13 +35,30 @@ const ProductCard = React.memo(({
 }) => {
   usePerformanceMonitor(`ProductCard-${product.id}`);
 
+  const handleCardClick = () => {
+    console.log('🖱️ Product card clicked:', product.id, product.name);
+    onNavigate(product.id);
+  };
+
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('❤️ Wishlist clicked:', product.id);
+    onToggleWishlist(product);
+  };
+
+  const handleAddToCartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    console.log('🛍️ Add to cart clicked:', product.id);
+    onAddToCart(product);
+  };
+
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-pink-50 flex flex-col relative cursor-pointer">
+    <div 
+      className="bg-white rounded-2xl overflow-hidden shadow-lg group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border border-pink-50 flex flex-col relative cursor-pointer"
+      onClick={handleCardClick}
+    >
       <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleWishlist(product);
-        }}
+        onClick={handleWishlistClick}
         disabled={isWishlistLoading}
         className={`absolute top-3 right-3 z-10 w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-md shadow-md transition-all active:scale-90 border border-white/20 ${
           isWishlistLoading 
@@ -62,10 +79,7 @@ const ProductCard = React.memo(({
         )}
       </button>
 
-      <div 
-        className="relative h-48 overflow-hidden"
-        onClick={() => onNavigate(product.id)}
-      >
+      <div className="relative h-48 overflow-hidden">
         <FastImage
           src={product.image_url || 'https://picsum.photos/400/400'}
           alt={product.name}
@@ -83,10 +97,8 @@ const ProductCard = React.memo(({
           </div>
         </div>
       </div>
-      <div 
-        className="p-4 flex flex-col flex-grow"
-        onClick={() => onNavigate(product.id)}
-      >
+      
+      <div className="p-4 flex flex-col flex-grow">
         <h3 className="text-base font-black text-gray-900 mb-1 italic truncate group-hover:text-pink-600 transition-colors">{product.name}</h3>
         <p className="text-lg font-black text-pink-500 mb-2">£{(product.price || 0).toFixed(2)}</p>
         
@@ -99,10 +111,7 @@ const ProductCard = React.memo(({
             {product.stock} available
           </div>
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddToCart(product);
-            }}
+            onClick={handleAddToCartClick}
             disabled={isAddingToCart || isAddedToCart}
             className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
               isAddedToCart 
@@ -212,7 +221,15 @@ const Shop: React.FC = () => {
   }, [toggleWishlist]);
 
   const handleNavigateToProduct = useCallback((productId: string) => {
-    navigate(`/product/${productId}`);
+    console.log('🔍 Navigating to product:', productId);
+    console.log('🔍 Navigation URL:', `/product/${productId}`);
+    console.log('🔍 Current location:', window.location.href);
+    try {
+      navigate(`/product/${productId}`);
+      console.log('✅ Navigation called successfully');
+    } catch (error) {
+      console.error('❌ Navigation error:', error);
+    }
   }, [navigate]);
 
   // Optimized filtering and sorting with memoization
@@ -356,6 +373,19 @@ const Shop: React.FC = () => {
               <span className="text-pink-500 ml-2">({products.length} total)</span>
             )}
           </p>
+          {/* Debug: Test direct navigation */}
+          {paginatedProducts.length > 0 && (
+            <button
+              onClick={() => {
+                const firstProduct = paginatedProducts[0];
+                console.log('🧪 Testing direct navigation to:', firstProduct.id);
+                navigate(`/product/${firstProduct.id}`);
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded text-xs"
+            >
+              Test Navigate
+            </button>
+          )}
         </div>
 
         {/* Products Grid */}

@@ -14,6 +14,9 @@ const ProductDetail: React.FC = () => {
   
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  
+  console.log('🔍 ProductDetail component loaded with ID:', id);
+  console.log('🔍 Current URL params:', useParams());
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);

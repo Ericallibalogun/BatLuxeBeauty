@@ -140,20 +140,24 @@ const Home: React.FC = () => {
                     )}
                   </button>
 
-                  <div className="relative h-48 overflow-hidden">
-                    <img 
-                      src={product.image_url || 'https://picsum.photos/400/400'} 
-                      alt={product.name}
-                      className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute top-3 left-3">
-                      <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-pink-50">
-                        {product.category || 'Beauty'}
-                      </span>
+                  <Link to={`/product/${product.id}`} className="block">
+                    <div className="relative h-48 overflow-hidden">
+                      <img 
+                        src={product.image_url || 'https://picsum.photos/400/400'} 
+                        alt={product.name}
+                        className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <span className="bg-white/95 backdrop-blur-md text-pink-600 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg border border-pink-50">
+                          {product.category || 'Beauty'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                   <div className="p-4 flex flex-col flex-grow">
-                    <h3 className="text-base font-black text-gray-900 mb-1 truncate italic">{product.name}</h3>
+                    <Link to={`/product/${product.id}`}>
+                      <h3 className="text-base font-black text-gray-900 mb-1 truncate italic hover:text-pink-600 transition-colors cursor-pointer">{product.name}</h3>
+                    </Link>
                     <p className="text-xs text-gray-400 mb-3 line-clamp-1 font-medium">
                       {product.description || 'Premium beauty product'}
                     </p>

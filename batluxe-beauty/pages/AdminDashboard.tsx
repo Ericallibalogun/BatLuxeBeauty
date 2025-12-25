@@ -27,6 +27,7 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [notification, setNotification] = useState<{message: string; type: 'success' | 'error'} | null>(null);
 
   // Pagination states
   const [productsPage, setProductsPage] = useState(1);
@@ -176,7 +177,9 @@ const AdminDashboard: React.FC = () => {
       const overrides = localStorage.getItem('order_status_overrides');
       if (overrides) {
         const parsed = JSON.parse(overrides);
-        return parsed[orderId] || null;
+        const override = parsed[orderId];
+        // Handle both old format (string) and new format (object)
+        return typeof override === 'string' ? override : override?.status || null;
       }
     } catch (error) {
       console.error('Error reading status overrides:', error);
@@ -188,7 +191,11 @@ const AdminDashboard: React.FC = () => {
     try {
       const existing = localStorage.getItem('order_status_overrides');
       const overrides = existing ? JSON.parse(existing) : {};
-      overrides[orderId] = newStatus;
+      overrides[orderId] = {
+        status: newStatus,
+        timestamp: new Date().toISOString(),
+        synced: false
+      };
       localStorage.setItem('order_status_overrides', JSON.stringify(overrides));
     } catch (error) {
       console.error('Error storing status override:', error);
@@ -216,8 +223,55 @@ const AdminDashboard: React.FC = () => {
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     setUpdatingStatus(true);
     try {
-      // Store the status override locally
-      setStoredStatusOverride(orderId, newStatus);
+      // First, try to update the status on the backend
+      try {
+        // Try multiple possible endpoints for updating order status
+        let updateSuccess = false;
+        
+        // Try PATCH /orders/{id}/status first
+        try {
+          await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+          updateSuccess = true;
+        } catch (err: any) {
+          if (err.response?.status === 404 || err.response?.status === 405) {
+            // Try PUT /orders/{id} with full order data
+            try {
+              await api.put(`/orders/${orderId}`, { status: newStatus });
+              updateSuccess = true;
+            } catch (err2: any) {
+              if (err2.response?.status === 404 || err2.response?.status === 405) {
+                // Try admin-specific endpoint
+                await api.patch(`/admin/orders/${orderId}/status`, { status: newStatus });
+                updateSuccess = true;
+              } else {
+                throw err2;
+              }
+            }
+          } else {
+            throw err;
+          }
+        }
+        
+        if (updateSuccess) {
+          console.log(`Order ${orderId} status successfully updated to ${newStatus} on backend`);
+          setNotification({message: `Order status updated to ${newStatus}`, type: 'success'});
+          
+          // Clear any local override since we've updated the backend
+          const existing = localStorage.getItem('order_status_overrides');
+          if (existing) {
+            const overrides = JSON.parse(existing);
+            delete overrides[orderId];
+            localStorage.setItem('order_status_overrides', JSON.stringify(overrides));
+          }
+        }
+      } catch (apiError: any) {
+        console.warn('Failed to update status on backend, storing locally:', apiError.message);
+        console.warn('API Error details:', apiError.response?.data);
+        
+        // If backend update fails, store locally as fallback
+        setStoredStatusOverride(orderId, newStatus);
+        setNotification({message: `Status updated locally. Backend sync failed.`, type: 'error'});
+      }
       
       // Update the viewing order if it's the current one
       if (viewingOrder && viewingOrder.id === orderId) {
@@ -238,13 +292,16 @@ const AdminDashboard: React.FC = () => {
       
       setShowStatusModal(false);
       
-      // Show success feedback (you could add a toast notification here)
+      // Show success feedback
       console.log(`Order ${orderId} status updated to ${newStatus}`);
       
     } catch (error) {
       console.error('Error updating order status:', error);
+      setNotification({message: 'Failed to update order status. Please try again.', type: 'error'});
     } finally {
       setUpdatingStatus(false);
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => setNotification(null), 3000);
     }
   };
   const calculateOrderTotal = (order: any) => {
@@ -471,6 +528,30 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FDF2F8]/20 py-12 text-gray-900">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-[200] p-4 rounded-xl shadow-lg border-2 animate-in slide-in-from-top-2 ${
+          notification.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800' 
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <div className="flex items-center gap-3">
+            {notification.type === 'success' ? (
+              <CheckCircle2 size={20} className="text-green-600" />
+            ) : (
+              <X size={20} className="text-red-600" />
+            )}
+            <span className="font-bold text-sm">{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="ml-2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
           <div className="text-left flex items-center gap-4">
@@ -652,7 +733,7 @@ const AdminDashboard: React.FC = () => {
                               {getEffectiveOrderStatus(order)}
                             </span>
                             {isStatusOverridden(order.id) && (
-                              <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse"></div>
+                              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" title="Status updated locally (pending backend sync)"></div>
                             )}
                           </div>
                         </div>
@@ -788,7 +869,7 @@ const AdminDashboard: React.FC = () => {
                             {getEffectiveOrderStatus(o)}
                           </span>
                           {isStatusOverridden(o.id) && (
-                            <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" title="Status updated locally"></div>
+                            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" title="Status updated locally (pending backend sync)"></div>
                           )}
                         </div>
                       </td>
@@ -1121,48 +1202,8 @@ const AdminDashboard: React.FC = () => {
                             </span>
                             {isStatusOverridden(viewingOrder.id) && (
                               <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>
-                                <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">Updated</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Acquisition Date</p>
-                           <p className="text-xs font-bold text-gray-900 flex items-center gap-2 justify-end">
-                              <Calendar size={12} className="text-pink-500" />
-                              {new Date(viewingOrder.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                           </p>
-                        </div>
-                      </div>
-                   </div>
-                </div>
-
-                {/* Logistics & Status */}
-                <div className="space-y-6 text-left">
-                   <div className="flex items-center gap-3 mb-2">
-                     <Info size={18} className="text-pink-500" />
-                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Status & Timing</h3>
-                   </div>
-                   <div className="bg-gray-50 p-6 rounded-3xl space-y-4 border border-pink-50">
-                      <div className="flex justify-between items-center">
-                        <div className="text-left">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current State</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border uppercase tracking-widest shadow-sm ${
-                              getEffectiveOrderStatus(viewingOrder) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                              getEffectiveOrderStatus(viewingOrder) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                              getEffectiveOrderStatus(viewingOrder) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                              getEffectiveOrderStatus(viewingOrder) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
-                              getEffectiveOrderStatus(viewingOrder) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
-                              'bg-blue-50 text-blue-600 border-blue-100'
-                            }`}>
-                              {getEffectiveOrderStatus(viewingOrder)}
-                            </span>
-                            {isStatusOverridden(viewingOrder.id) && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>
-                                <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">Updated</span>
+                                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                                <span className="text-[8px] font-black text-orange-500 uppercase tracking-widest">Local Update</span>
                               </div>
                             )}
                           </div>

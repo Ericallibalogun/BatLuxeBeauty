@@ -34,19 +34,29 @@ export interface UserProfile {
   role: string;
 }
 
+export interface ShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}
+
 export interface Order {
   id: string;
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   total_amount: number;
   total_price?: number; // Backend might use this field
   subtotal?: number;
   shipping_fee?: number;
-  status: 'Pending' | 'Shipped' | 'Delivered' | 'Cancelled';
+  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
   created_at: string;
   updated_at?: string;
   items_count: number;
   items?: OrderItem[];
+  shipping_address?: ShippingAddress;
 }
 
 export interface OrderItem {

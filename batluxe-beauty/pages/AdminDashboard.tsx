@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   // Available status options
-  const statusOptions = [
+  const statusOptions: { value: Order['status']; label: string; color: string }[] = [
     { value: 'Pending', label: 'Pending', color: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
     { value: 'Processing', label: 'Processing', color: 'bg-blue-50 text-blue-600 border-blue-100' },
     { value: 'Shipped', label: 'Shipped', color: 'bg-purple-50 text-purple-600 border-purple-100' },
@@ -213,7 +213,7 @@ const AdminDashboard: React.FC = () => {
     { value: 'Cancelled', label: 'Cancelled', color: 'bg-red-50 text-red-600 border-red-100' }
   ];
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     setUpdatingStatus(true);
     try {
       // Store the status override locally
@@ -329,12 +329,33 @@ const AdminDashboard: React.FC = () => {
     setOrderItems([]);
     setLoadingOrderDetails(true);
     try {
-      const response = await api.get(`/orders/${order.id}`);
+      // Try regular orders endpoint first, then admin endpoint if needed
+      let response;
+      try {
+        response = await api.get(`/orders/${order.id}`);
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 403) {
+          // Fallback to admin endpoint
+          response = await api.get(`/admin/orders/${order.id}`);
+        } else {
+          throw err;
+        }
+      }
+      
       const data = response.data;
       console.log('Admin order details response:', data);
+      console.log('Full order data structure:', JSON.stringify(data, null, 2));
       
       // Backend returns { order: {...} } or direct order data
       const orderData = data.order || data;
+      console.log('Extracted order data:', orderData);
+      console.log('Shipping address in order data:', orderData.shipping_address);
+      console.log('All order data keys:', Object.keys(orderData));
+      console.log('Address-related fields:', Object.keys(orderData).filter(key => 
+        key.toLowerCase().includes('address') || 
+        key.toLowerCase().includes('shipping') ||
+        key.toLowerCase().includes('delivery')
+      ));
       
       // Get items from the order data
       let items = orderData.items || orderData.order_items || [];
@@ -356,7 +377,9 @@ const AdminDashboard: React.FC = () => {
       setViewingOrder({
         ...order,
         ...orderData,
-        items: items
+        items: items,
+        // Ensure shipping address is properly set
+        shipping_address: orderData.shipping_address || orderData.delivery_address || orderData.address || null
       });
       
     } catch (err) {
@@ -1006,6 +1029,111 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Mail size={14} className="text-gray-300" />
                         <p className="text-sm font-bold text-gray-600">{viewingOrder.customer_email}</p>
+                      </div>
+                      {viewingOrder.customer_phone && (
+                        <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone</p>
+                          <p className="text-sm font-bold text-gray-600">{viewingOrder.customer_phone}</p>
+                        </div>
+                      )}
+                   </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div className="space-y-6 text-left">
+                   <div className="flex items-center gap-3 mb-2">
+                     <Package size={18} className="text-pink-500" />
+                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Shipping Address</h3>
+                   </div>
+                   <div className="bg-gray-50 p-6 rounded-3xl space-y-4 border border-pink-50">
+                      {viewingOrder.shipping_address ? (
+                        <>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Street Address</p>
+                            <p className="font-black text-gray-900">{viewingOrder.shipping_address.street}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">City</p>
+                              <p className="text-sm font-bold text-gray-600">{viewingOrder.shipping_address.city}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Postal Code</p>
+                              <p className="text-sm font-bold text-gray-600">{viewingOrder.shipping_address.postal_code}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">State/Region</p>
+                              <p className="text-sm font-bold text-gray-600">{viewingOrder.shipping_address.state}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Country</p>
+                              <p className="text-sm font-bold text-gray-600">{viewingOrder.shipping_address.country}</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-4">
+                          <p className="text-red-500 font-bold text-sm">⚠️ No shipping address available</p>
+                          <p className="text-gray-400 text-xs mt-1">This order may be missing shipping information</p>
+                          <details className="mt-2 text-left">
+                            <summary className="text-xs text-gray-500 cursor-pointer">Debug Info</summary>
+                            <pre className="text-xs text-gray-400 mt-1 bg-gray-100 p-2 rounded overflow-auto">
+                              {JSON.stringify({
+                                orderId: viewingOrder.id,
+                                hasShippingAddress: !!viewingOrder.shipping_address,
+                                availableFields: Object.keys(viewingOrder).filter(key => 
+                                  key.toLowerCase().includes('address') || 
+                                  key.toLowerCase().includes('shipping') ||
+                                  key.toLowerCase().includes('delivery')
+                                )
+                              }, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      )}
+                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-10">
+                {/* Status & Timing */}
+                <div className="space-y-6 text-left">
+                   <div className="flex items-center gap-3 mb-2">
+                     <Info size={18} className="text-pink-500" />
+                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Status & Timing</h3>
+                   </div>
+                   <div className="bg-gray-50 p-6 rounded-3xl space-y-4 border border-pink-50">
+                      <div className="flex justify-between items-center">
+                        <div className="text-left">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Current State</p>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border uppercase tracking-widest shadow-sm ${
+                              getEffectiveOrderStatus(viewingOrder) === 'Pending' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Delivered' ? 'bg-green-50 text-green-600 border-green-100' :
+                              getEffectiveOrderStatus(viewingOrder) === 'Cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                              'bg-blue-50 text-blue-600 border-blue-100'
+                            }`}>
+                              {getEffectiveOrderStatus(viewingOrder)}
+                            </span>
+                            {isStatusOverridden(viewingOrder.id) && (
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>
+                                <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">Updated</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Acquisition Date</p>
+                           <p className="text-xs font-bold text-gray-900 flex items-center gap-2 justify-end">
+                              <Calendar size={12} className="text-pink-500" />
+                              {new Date(viewingOrder.created_at || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                           </p>
+                        </div>
                       </div>
                    </div>
                 </div>

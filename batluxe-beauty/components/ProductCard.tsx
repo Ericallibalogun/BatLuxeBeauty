@@ -79,9 +79,11 @@ const ProductCard = memo(
                             <span className="text-lg font-black text-gray-900">£{(product.price || 0).toFixed(2)}</span>
                         </div>
                         <div className="mb-3">
-                            <div className="bg-green-50/50 text-green-700 text-[8px] py-1 px-2 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">
-                                {product.stock} available
-                            </div>
+                            {product.stock <= 0 ? (
+                                <span className="out-of-stock bg-red-50/50 text-red-700 text-[8px] py-1 px-2 rounded-full font-black uppercase tracking-widest border border-red-100/50 inline-block">OUT OF STOCK</span>
+                            ) : (
+                                <span className="in-stock bg-green-50/50 text-green-700 text-[8px] py-1 px-2 rounded-full font-black uppercase tracking-widest border border-green-100/50 inline-block">In stock: {product.stock}</span>
+                            )}
                         </div>
                         <button 
                             onClick={(e) => {
@@ -89,14 +91,18 @@ const ProductCard = memo(
                                 e.stopPropagation();
                                 onAddToCart(product);
                             }}
-                            disabled={isAddingToCart || addSuccess}
+                            disabled={isAddingToCart || addSuccess || product.stock <= 0}
                             className={`w-full py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
-                                addSuccess 
+                                product.stock <= 0
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : addSuccess 
                                 ? 'bg-green-500 text-white' 
                                 : 'bg-gray-900 hover:bg-pink-600 text-white'
                             }`}
                         >
-                            {isAddingToCart ? (
+                            {product.stock <= 0 ? (
+                                'Out of Stock'
+                            ) : isAddingToCart ? (
                                 <Loader2 className="animate-spin" size={14} />
                             ) : addSuccess ? (
                                 <>
